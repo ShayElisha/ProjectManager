@@ -5,8 +5,8 @@ node_modules
 /public
 packages/shared/dist
 packages/api/dist
-api/nest
-packages/web/api/nest
+server/nest
+packages/web/server/nest
 .turbo
 .env
 .env.local

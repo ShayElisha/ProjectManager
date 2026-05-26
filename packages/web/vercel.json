@@ -13,15 +13,15 @@
     }
   },
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "maxDuration": 60,
       "memory": 1024,
-      "includeFiles": "api/nest/**"
+      "includeFiles": "node_modules/@nexus/api/**,node_modules/@prisma/**,node_modules/.prisma/**"
     }
   },
   "rewrites": [
-    { "source": "/api", "destination": "/api/index.ts" },
-    { "source": "/api/(.*)", "destination": "/api/index.ts" },
+    { "source": "/api", "destination": "/api/index.js" },
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

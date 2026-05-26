@@ -99,6 +99,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@nexus/api':
+        specifier: workspace:*
+        version: link:../api
       '@nexus/shared':
         specifier: workspace:*
         version: link:../shared

@@ -44,7 +44,7 @@ vercel --prod
 
 | שדה | ערך |
 |-----|-----|
-| **Root Directory** | `packages/web` |
+| **Root Directory** | `packages/web` (**לא** `packages/api`) |
 | **Output Directory** | `dist` |
 | **Framework Preset** | Other |
 | **Build Command** | ריק (נלקח מ-`packages/web/vercel.json`) |
@@ -64,7 +64,7 @@ vercel --prod
 
 **Production URL:** בדוק ב-Vercel → Domains את הדומיין האמיתי (למשל `core-pilote.vercel.app`). אם `/` מחזיר `404 NOT_FOUND`, הבילד לא העלה קבצים סטטיים.
 
-אחרי הבילד, `scripts/vercel-prepare.mjs` ממלא `public/` (מה ש-Vercel Dashboard דורש), `dist/`, `api/nest`, ו-`.vercel/output/`.
+אחרי הבילד, `scripts/vercel-prepare.mjs` ממלא `dist/`, `public/`, ו-`server/nest` (מחוץ ל-`api/` — Vercel לא יפרוס אותו כ-endpoint נפרד).
 
 אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 
@@ -77,7 +77,7 @@ vercel --prod
 
 ```
 vercel.json          → build + SPA fallback + rewrite ל-API
-api/index.ts         → כל בקשות /api/* (מייבא מ-`api/nest/serverless.js` שנבנה בבילד)
+api/index.js         → כל בקשות /api/* (מייבא מ-`server/nest/serverless.js` שנבנה בבילד)
 packages/web/dist    → React SPA
 packages/api/dist    → NestJS (serverless-http)
 ```

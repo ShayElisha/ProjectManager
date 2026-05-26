@@ -1,17 +1,14 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = resolve(scriptDir, "..");
-const cwd = process.cwd();
 
 function findWebBuildOutput() {
   const candidates = [
     resolve(monorepoRoot, "packages/web/dist"),
     resolve(monorepoRoot, "dist"),
-    resolve(cwd, "dist"),
-    resolve(cwd, "public"),
   ];
   for (const dir of candidates) {
     if (existsSync(resolve(dir, "index.html"))) return dir;
@@ -33,8 +30,8 @@ if (!existsSync(apiDist)) {
   process.exit(1);
 }
 
-function bundleApiForHandler(apiDir) {
-  const nestDir = resolve(apiDir, "nest");
+function bundleApiForHandler(serverDir) {
+  const nestDir = resolve(serverDir, "nest");
   rmSync(nestDir, { recursive: true, force: true });
   mkdirSync(nestDir, { recursive: true });
   cpSync(apiDist, nestDir, { recursive: true });
@@ -55,88 +52,39 @@ function mirrorStatic(targetDir) {
   console.log(`[vercel-prepare] Static → ${target}`);
 }
 
-function writeBuildOutputApi(outputRoot) {
-  const root = resolve(outputRoot);
-  const staticDir = resolve(root, "static");
-  const apiFuncDir = resolve(root, "functions/api.func");
-
-  rmSync(root, { recursive: true, force: true });
-  mkdirSync(staticDir, { recursive: true });
-  cpSync(webBuilt, staticDir, { recursive: true });
-
-  mkdirSync(apiFuncDir, { recursive: true });
-  cpSync(apiDist, resolve(apiFuncDir, "nest"), { recursive: true });
-  cpSync(apiPrisma, resolve(apiFuncDir, "nest/prisma"), { recursive: true });
-
-  writeFileSync(
-    resolve(apiFuncDir, "index.js"),
-    `'use strict';
-const mod = require('./nest/serverless.js');
-module.exports = mod.default;
-`,
-  );
-
-  writeFileSync(
-    resolve(apiFuncDir, ".vc-config.json"),
-    `${JSON.stringify(
-      {
-        runtime: "nodejs20.x",
-        handler: "index",
-        launcherType: "Nodejs",
-        maxDuration: 60,
-        memory: 1024,
-      },
-      null,
-      2,
-    )}\n`,
-  );
-
-  writeFileSync(
-    resolve(root, "config.json"),
-    `${JSON.stringify(
-      {
-        version: 3,
-        routes: [
-          { src: "/api/(.*)", dest: "/api" },
-          { handle: "filesystem" },
-          { src: "/(.*)", dest: "/index.html" },
-        ],
-      },
-      null,
-      2,
-    )}\n`,
-  );
-
-  console.log(`[vercel-prepare] Build Output API → ${root}`);
+function removeBuildOutputApiArtifacts() {
+  for (const dir of [
+    resolve(monorepoRoot, ".vercel/output"),
+    resolve(monorepoRoot, "packages/web/.vercel/output"),
+  ]) {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
-bundleApiForHandler(resolve(monorepoRoot, "api"));
-bundleApiForHandler(resolve(monorepoRoot, "packages/web/api"));
+removeBuildOutputApiArtifacts();
 
-const staticTargets = [
+for (const legacy of [
+  resolve(monorepoRoot, "api/nest"),
+  resolve(monorepoRoot, "packages/web/api/nest"),
+]) {
+  rmSync(legacy, { recursive: true, force: true });
+}
+
+bundleApiForHandler(resolve(monorepoRoot, "server"));
+bundleApiForHandler(resolve(monorepoRoot, "packages/web/server"));
+
+for (const dir of [
   resolve(monorepoRoot, "packages/web/dist"),
   resolve(monorepoRoot, "packages/web/public"),
-  resolve(monorepoRoot, "public"),
   resolve(monorepoRoot, "dist"),
-  resolve(cwd, "dist"),
-  resolve(cwd, "public"),
-];
-
-for (const dir of staticTargets) {
+  resolve(monorepoRoot, "public"),
+]) {
   mirrorStatic(dir);
 }
 
-for (const out of [
-  resolve(monorepoRoot, ".vercel/output"),
-  resolve(monorepoRoot, "packages/web/.vercel/output"),
-  resolve(cwd, ".vercel/output"),
-]) {
-  writeBuildOutputApi(out);
-}
-
 const mustExist = [
+  resolve(monorepoRoot, "packages/web/dist/index.html"),
   resolve(monorepoRoot, "packages/web/public/index.html"),
-  resolve(monorepoRoot, "public/index.html"),
 ];
 
 for (const file of mustExist) {
@@ -146,4 +94,4 @@ for (const file of mustExist) {
   }
 }
 
-console.log("[vercel-prepare] Done — public/, dist/, api/nest, .vercel/output ready");
+console.log("[vercel-prepare] Done — dist, public, server/nest ready (classic Vercel output)");

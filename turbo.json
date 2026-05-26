@@ -15,10 +15,9 @@
       "dependsOn": ["^build"],
       "outputs": [
         "dist/**",
-        ".vercel/output/**",
-        "packages/web/.vercel/output/**",
-        "api/nest/**",
-        "packages/web/api/nest/**"
+        "public/**",
+        "server/nest/**",
+        "packages/web/server/nest/**"
       ],
       "env": ["DATABASE_URL", "USE_EMBEDDED_MONGO", "PORT", "VERCEL"]
     },
