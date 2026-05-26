@@ -38,12 +38,19 @@ vercel --prod
 
 או: Import את ה-repo ב-Vercel Dashboard — Framework Preset: **Other**, Build Command ו-Output כבר ב-`vercel.json`.
 
-**חשוב:** ב-Project Settings → General → **Root Directory** השאר ריק (שורש הריפו, לא `packages/web`). אחרת `build:vercel` לא יימצא.
+**Root Directory** — שתי אפשרויות תקינות:
+
+| Root Directory | Output (ידני אם צריך) | קובץ הגדרות |
+|----------------|------------------------|-------------|
+| ריק (שורש הריפו) | `packages/web/dist` | `vercel.json` בשורש |
+| `packages/web` | `dist` | `packages/web/vercel.json` |
+
+אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 
 אם Vercel עדיין נכשל, הגדר ידנית:
-- Install Command: `pnpm install --frozen-lockfile` (כל ה-workspace — לא `pnpm -w install`)
+- Install Command: `pnpm install --frozen-lockfile`
 - Build Command: `pnpm -w run build:vercel`
-- Output Directory: `packages/web/dist`
+- Output Directory: לפי הטבלה למעלה
 
 ## מבנה הפריסה
 
