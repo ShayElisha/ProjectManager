@@ -46,7 +46,7 @@ vercel --prod
 |-----|----------|
 | **Build Command** | ריק (Override מכובה) — או `pnpm -w run build:vercel` |
 | **Install Command** | ריק — או `pnpm install --frozen-lockfile` |
-| **Output Directory** | **ריק (חובה)** — הפריסה משתמשת ב-Build Output API (`.vercel/output`) שנוצר בבילד |
+| **Output Directory** | `public` (או ריק — `vercel.json` מגדיר `public`; הבילד ממלא אותו אוטומטית) |
 
 > **למה `ERR_PNPM_NO_SCRIPT build:vercel`?**  
 > Vercel מריץ פקודות מתוך **Root Directory** (למשל `packages/web`). הסקריפט `build:vercel` מוגדר רק ב-`package.json` **של שורש המונורפו**.  
@@ -65,7 +65,7 @@ vercel --prod
 
 **Production URL:** בדוק ב-Vercel → Domains את הדומיין האמיתי (למשל `core-pilote.vercel.app`). אם `/` מחזיר `404 NOT_FOUND`, הבילד לא העלה קבצים סטטיים.
 
-אחרי הבילד, `scripts/vercel-prepare.mjs` יוצר `.vercel/output/` (סטטי + API) — לא תלוי ב-`outputDirectory` / `dist` ב-Dashboard.
+אחרי הבילד, `scripts/vercel-prepare.mjs` ממלא `public/` (מה ש-Vercel Dashboard דורש), `dist/`, `api/nest`, ו-`.vercel/output/`.
 
 אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 

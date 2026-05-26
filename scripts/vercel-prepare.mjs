@@ -11,6 +11,7 @@ function findWebBuildOutput() {
     resolve(monorepoRoot, "packages/web/dist"),
     resolve(monorepoRoot, "dist"),
     resolve(cwd, "dist"),
+    resolve(cwd, "public"),
   ];
   for (const dir of candidates) {
     if (existsSync(resolve(dir, "index.html"))) return dir;
@@ -32,7 +33,28 @@ if (!existsSync(apiDist)) {
   process.exit(1);
 }
 
-/** @param {string} outputRoot */
+function bundleApiForHandler(apiDir) {
+  const nestDir = resolve(apiDir, "nest");
+  rmSync(nestDir, { recursive: true, force: true });
+  mkdirSync(nestDir, { recursive: true });
+  cpSync(apiDist, nestDir, { recursive: true });
+  cpSync(apiPrisma, resolve(nestDir, "prisma"), { recursive: true });
+  console.log(`[vercel-prepare] API bundle → ${nestDir}`);
+}
+
+function mirrorStatic(targetDir) {
+  const target = resolve(targetDir);
+  const source = resolve(webBuilt);
+  if (target === source) {
+    console.log(`[vercel-prepare] Static OK at ${target}`);
+    return;
+  }
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(dirname(target), { recursive: true });
+  cpSync(source, target, { recursive: true });
+  console.log(`[vercel-prepare] Static → ${target}`);
+}
+
 function writeBuildOutputApi(outputRoot) {
   const root = resolve(outputRoot);
   const staticDir = resolve(root, "static");
@@ -88,12 +110,40 @@ module.exports = mod.default;
   console.log(`[vercel-prepare] Build Output API → ${root}`);
 }
 
-const outputTargets = new Set([
+bundleApiForHandler(resolve(monorepoRoot, "api"));
+bundleApiForHandler(resolve(monorepoRoot, "packages/web/api"));
+
+const staticTargets = [
+  resolve(monorepoRoot, "packages/web/dist"),
+  resolve(monorepoRoot, "packages/web/public"),
+  resolve(monorepoRoot, "public"),
+  resolve(monorepoRoot, "dist"),
+  resolve(cwd, "dist"),
+  resolve(cwd, "public"),
+];
+
+for (const dir of staticTargets) {
+  mirrorStatic(dir);
+}
+
+for (const out of [
   resolve(monorepoRoot, ".vercel/output"),
   resolve(monorepoRoot, "packages/web/.vercel/output"),
   resolve(cwd, ".vercel/output"),
-]);
-
-for (const target of outputTargets) {
-  writeBuildOutputApi(target);
+]) {
+  writeBuildOutputApi(out);
 }
+
+const mustExist = [
+  resolve(monorepoRoot, "packages/web/public/index.html"),
+  resolve(monorepoRoot, "public/index.html"),
+];
+
+for (const file of mustExist) {
+  if (!existsSync(file)) {
+    console.error(`[vercel-prepare] Required output missing: ${file}`);
+    process.exit(1);
+  }
+}
+
+console.log("[vercel-prepare] Done — public/, dist/, api/nest, .vercel/output ready");
