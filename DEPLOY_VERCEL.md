@@ -38,15 +38,19 @@ vercel --prod
 
 או: Import את ה-repo ב-Vercel Dashboard — Framework Preset: **Other**.
 
-### הגדרות Dashboard (חובה — מונע שגיאות חוזרות)
+### הגדרות Dashboard — **אפשרות א (מומלץ)**
 
 **Settings → General → Build & Development**
 
-| שדה | ערך נכון |
-|-----|----------|
-| **Build Command** | ריק (Override מכובה) — או `pnpm -w run build:vercel` |
-| **Install Command** | ריק — או `pnpm install --frozen-lockfile` |
-| **Output Directory** | `public` (אם Root = `packages/web`) או `packages/web/dist` (אם Root = שורש הריפו) |
+| שדה | ערך |
+|-----|-----|
+| **Root Directory** | `packages/web` |
+| **Output Directory** | `public` |
+| **Framework Preset** | Other |
+| **Build Command** | ריק (נלקח מ-`packages/web/vercel.json`) |
+| **Install Command** | ריק |
+
+> אחרי שמירה: **Deployments → Redeploy** (בלי cache אם אפשר).
 
 > **חשוב:** ב-`.gitignore` אסור `public` או `dist` בלי `/` — זה מסתיר את `packages/web/public` מ-Vercel וגורם ל־`No Output Directory named public found`.
 
@@ -54,15 +58,7 @@ vercel --prod
 > Vercel מריץ פקודות מתוך **Root Directory** (למשל `packages/web`). הסקריפט `build:vercel` מוגדר רק ב-`package.json` **של שורש המונורפו**.  
 > פתרון: תמיד `pnpm -w run build:vercel` (`-w` = workspace root), או Override ב-Dashboard שמצביע על הסקריפט הזה — **לא** `pnpm run build:vercel` בלי `-w`.
 
-**Root Directory** — בחר **אחד** (לא לערבב):
-
-| Root Directory | Output Directory (Dashboard) | קובץ הגדרות |
-|----------------|------------------------------|-------------|
-| **ריק** (שורש הריפו) | `packages/web/public` | `vercel.json` בשורש |
-| **`packages/web`** | `public` | `packages/web/vercel.json` |
-
-> **לא** להגדיר Output = `public` כש-Root Directory **ריק** — Vercel יחפש `/public` בשורש (מוסתר ב-`.gitignore`).  
-> או: Root = `packages/web` + Output = `public` (הכי פשוט).
+קובץ הגדרות לפריסה: `packages/web/vercel.json` (`outputDirectory: public`, API ב-`packages/web/api/`).
 
 > **Output Directory ב-Dashboard:** מחק `public` / `dist` ידניים — `vercel.json` קובע (`dist` או `packages/web/dist`). אם חייבים להשאיר `public`, הבילד מעתיק גם לשם אוטומטית.
 
