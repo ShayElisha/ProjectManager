@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".vercel/**", "api/nest/**", "packages/web/api/nest/**"]
     },
     "dev": {
       "cache": false,

@@ -14,8 +14,8 @@ if (!existsSync(apiDist)) {
   process.exit(1);
 }
 
-if (!existsSync(webDist)) {
-  console.error("[vercel-prepare] Missing packages/web/dist — run build:vercel first.");
+if (!existsSync(webDist) || !existsSync(resolve(webDist, "index.html"))) {
+  console.error("[vercel-prepare] Missing packages/web/dist/index.html — run build:vercel first.");
   process.exit(1);
 }
 

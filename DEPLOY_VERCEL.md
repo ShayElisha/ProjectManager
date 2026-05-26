@@ -40,10 +40,14 @@ vercel --prod
 
 **Root Directory** — שתי אפשרויות תקינות:
 
-| Root Directory | Output Directory | קובץ הגדרות |
-|----------------|------------------|-------------|
-| ריק (שורש הריפו) | `dist` | `vercel.json` בשורש |
-| `packages/web` | `dist` | `packages/web/vercel.json` |
+| Root Directory | קובץ הגדרות |
+|----------------|-------------|
+| ריק (שורש הריפו) | `vercel.json` בשורש |
+| `packages/web` | `packages/web/vercel.json` |
+
+> **אל תגדיר Output Directory ידנית ב-Dashboard** — השאר ריק. `outputDirectory` ב-`vercel.json` הוסר; הפריסה משתמשת ב-`@vercel/static-build` + `@vercel/node`.
+
+**Production URL:** בדוק ב-Vercel → Domains את הדומיין האמיתי (למשל `core-pilote.vercel.app`). אם `/` מחזיר `404 NOT_FOUND`, הבילד לא העלה קבצים סטטיים.
 
 אחרי הבילד, `scripts/vercel-prepare.mjs` מעתיק:
 - `packages/web/dist` → `dist` (בשורש הריפו)
