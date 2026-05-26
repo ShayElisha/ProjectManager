@@ -1,1 +1,1 @@
-export { default, config } from "../../api/dist/serverless.js";
+export { default, config } from "./nest/serverless.js";

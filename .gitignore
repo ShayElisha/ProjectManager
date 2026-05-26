@@ -1,5 +1,7 @@
 node_modules
 dist
+api/nest
+packages/web/api/nest
 .turbo
 .env
 .env.local

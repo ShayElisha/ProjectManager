@@ -45,7 +45,9 @@ vercel --prod
 | ריק (שורש הריפו) | `dist` | `vercel.json` בשורש |
 | `packages/web` | `dist` | `packages/web/vercel.json` |
 
-אחרי הבילד, `build:vercel` מעתיק אוטומטית את `packages/web/dist` → `dist` (סקריפט `scripts/vercel-sync-dist.mjs`).
+אחרי הבילד, `scripts/vercel-prepare.mjs` מעתיק:
+- `packages/web/dist` → `dist` (בשורש הריפו)
+- `packages/api/dist` → `api/nest` ו-`packages/web/api/nest` (כדי שה-Serverless Function יכלול את Nest)
 
 אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 
@@ -58,7 +60,7 @@ vercel --prod
 
 ```
 vercel.json          → build + SPA fallback + rewrite ל-API
-api/index.ts         → כל בקשות /api/* (לא [[...path]] — לא נתמך מחוץ ל-Next.js)
+api/index.ts         → כל בקשות /api/* (מייבא מ-`api/nest/serverless.js` שנבנה בבילד)
 packages/web/dist    → React SPA
 packages/api/dist    → NestJS (serverless-http)
 ```
