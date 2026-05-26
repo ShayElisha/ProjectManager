@@ -1,5 +1,3 @@
-# Vercel uses .gitignore by default; explicitly allow frontend build output
-!packages/web/dist
+# Vercel applies gitignore when packaging build output. Allow frontend deploy dirs:
 !packages/web/public
-!/dist
-!/public
+!packages/web/dist
