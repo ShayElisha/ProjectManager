@@ -1,8 +1,9 @@
 node_modules
 .vercel
-dist
-public
-packages/web/public
+# Root-only build artifacts (do NOT use bare "dist" or "public" — that hides packages/web/dist from Vercel)
+/dist
+/public
+packages/api/dist
 api/nest
 packages/web/api/nest
 .turbo

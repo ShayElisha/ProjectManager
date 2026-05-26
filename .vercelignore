@@ -1,0 +1,5 @@
+# Vercel uses .gitignore by default; explicitly allow frontend build output
+!packages/web/dist
+!packages/web/public
+!/dist
+!/public

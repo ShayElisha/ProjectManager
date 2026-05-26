@@ -46,7 +46,9 @@ vercel --prod
 |-----|----------|
 | **Build Command** | ריק (Override מכובה) — או `pnpm -w run build:vercel` |
 | **Install Command** | ריק — או `pnpm install --frozen-lockfile` |
-| **Output Directory** | `public` (או ריק — `vercel.json` מגדיר `public`; הבילד ממלא אותו אוטומטית) |
+| **Output Directory** | `public` (אם Root = `packages/web`) או `packages/web/dist` (אם Root = שורש הריפו) |
+
+> **חשוב:** ב-`.gitignore` אסור `public` או `dist` בלי `/` — זה מסתיר את `packages/web/public` מ-Vercel וגורם ל־`No Output Directory named public found`.
 
 > **למה `ERR_PNPM_NO_SCRIPT build:vercel`?**  
 > Vercel מריץ פקודות מתוך **Root Directory** (למשל `packages/web`). הסקריפט `build:vercel` מוגדר רק ב-`package.json` **של שורש המונורפו**.  
