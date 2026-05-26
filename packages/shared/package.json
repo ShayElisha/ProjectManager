@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "build:vercel": "pnpm -w run build:vercel",
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit"

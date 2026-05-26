@@ -36,7 +36,21 @@ vercel env add CORS_ORIGINS
 vercel --prod
 ```
 
-או: Import את ה-repo ב-Vercel Dashboard — Framework Preset: **Other**, Build Command ו-Output כבר ב-`vercel.json`.
+או: Import את ה-repo ב-Vercel Dashboard — Framework Preset: **Other**.
+
+### הגדרות Dashboard (חובה — מונע שגיאות חוזרות)
+
+**Settings → General → Build & Development**
+
+| שדה | ערך נכון |
+|-----|----------|
+| **Build Command** | ריק (Override מכובה) — או `pnpm -w run build:vercel` |
+| **Install Command** | ריק — או `pnpm install --frozen-lockfile` |
+| **Output Directory** | ריק — או `dist` אם Root = `packages/web`, או `packages/web/dist` אם Root = שורש הריפו |
+
+> **למה `ERR_PNPM_NO_SCRIPT build:vercel`?**  
+> Vercel מריץ פקודות מתוך **Root Directory** (למשל `packages/web`). הסקריפט `build:vercel` מוגדר רק ב-`package.json` **של שורש המונורפו**.  
+> פתרון: תמיד `pnpm -w run build:vercel` (`-w` = workspace root), או Override ב-Dashboard שמצביע על הסקריפט הזה — **לא** `pnpm run build:vercel` בלי `-w`.
 
 **Root Directory** — שתי אפשרויות תקינות:
 
