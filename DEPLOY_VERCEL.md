@@ -41,7 +41,7 @@ vercel --prod
 **חשוב:** ב-Project Settings → General → **Root Directory** השאר ריק (שורש הריפו, לא `packages/web`). אחרת `build:vercel` לא יימצא.
 
 אם Vercel עדיין נכשל, הגדר ידנית:
-- Install Command: `pnpm -w install`
+- Install Command: `pnpm install --frozen-lockfile` (כל ה-workspace — לא `pnpm -w install`)
 - Build Command: `pnpm -w run build:vercel`
 - Output Directory: `packages/web/dist`
 
