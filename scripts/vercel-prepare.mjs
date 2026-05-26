@@ -4,18 +4,37 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = resolve(scriptDir, "..");
+const cwd = process.cwd();
 
-const apiDist = resolve(monorepoRoot, "packages/api/dist");
-const apiPrisma = resolve(monorepoRoot, "packages/api/prisma");
-const webDist = resolve(monorepoRoot, "packages/web/dist");
+function findWebBuildOutput() {
+  const candidates = [
+    resolve(monorepoRoot, "packages/web/dist"),
+    resolve(monorepoRoot, "dist"),
+    resolve(cwd, "dist"),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(resolve(dir, "index.html"))) return dir;
+  }
+  return null;
+}
 
-if (!existsSync(apiDist)) {
-  console.error("[vercel-prepare] Missing packages/api/dist — run build:vercel first.");
+const webBuilt = findWebBuildOutput();
+if (!webBuilt) {
+  console.error(
+    "[vercel-prepare] No frontend build found.",
+    "Checked:",
+    resolve(monorepoRoot, "packages/web/dist"),
+    resolve(monorepoRoot, "dist"),
+    resolve(cwd, "dist"),
+  );
   process.exit(1);
 }
 
-if (!existsSync(webDist) || !existsSync(resolve(webDist, "index.html"))) {
-  console.error("[vercel-prepare] Missing packages/web/dist/index.html — run build:vercel first.");
+const apiDist = resolve(monorepoRoot, "packages/api/dist");
+const apiPrisma = resolve(monorepoRoot, "packages/api/prisma");
+
+if (!existsSync(apiDist)) {
+  console.error("[vercel-prepare] Missing packages/api/dist — run build:vercel first.");
   process.exit(1);
 }
 
@@ -28,15 +47,34 @@ function bundleApiForHandler(apiDir) {
   console.log(`[vercel-prepare] API bundle → ${nestDir}`);
 }
 
-function mirrorDist(targetDir) {
-  rmSync(targetDir, { recursive: true, force: true });
-  cpSync(webDist, targetDir, { recursive: true });
-  console.log(`[vercel-prepare] Web dist → ${targetDir}`);
+function mirrorWebDist(targetDir) {
+  const target = resolve(targetDir);
+  const source = resolve(webBuilt);
+  if (target === source) {
+    console.log(`[vercel-prepare] Web dist OK at ${target}`);
+    return;
+  }
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(dirname(target), { recursive: true });
+  cpSync(source, target, { recursive: true });
+  console.log(`[vercel-prepare] Web dist → ${target}`);
 }
 
 bundleApiForHandler(resolve(monorepoRoot, "api"));
 bundleApiForHandler(resolve(monorepoRoot, "packages/web/api"));
 
-mirrorDist(resolve(monorepoRoot, "dist"));
-mirrorDist(resolve(monorepoRoot, "public"));
-mirrorDist(resolve(monorepoRoot, "packages/web/public"));
+const outputDirs = [
+  resolve(monorepoRoot, "packages/web/dist"),
+  resolve(monorepoRoot, "dist"),
+  resolve(monorepoRoot, "public"),
+  resolve(monorepoRoot, "packages/web/public"),
+  resolve(cwd, "dist"),
+  resolve(cwd, "public"),
+];
+
+for (const dir of outputDirs) {
+  mirrorWebDist(dir);
+}
+
+const verified = outputDirs.filter((d) => existsSync(resolve(d, "index.html")));
+console.log(`[vercel-prepare] index.html present in ${verified.length} output dir(s)`);
