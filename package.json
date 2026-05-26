@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "build:vercel": "turbo run build --filter=@nexus/shared --filter=@nexus/api --filter=@nexus/web",
+    "build:vercel": "turbo run build --filter=@nexus/shared --filter=@nexus/api --filter=@nexus/web && node scripts/vercel-sync-dist.mjs",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"
   },

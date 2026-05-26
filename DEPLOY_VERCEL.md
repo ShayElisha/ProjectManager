@@ -40,10 +40,12 @@ vercel --prod
 
 **Root Directory** — שתי אפשרויות תקינות:
 
-| Root Directory | Output (ידני אם צריך) | קובץ הגדרות |
-|----------------|------------------------|-------------|
-| ריק (שורש הריפו) | `packages/web/dist` | `vercel.json` בשורש |
+| Root Directory | Output Directory | קובץ הגדרות |
+|----------------|------------------|-------------|
+| ריק (שורש הריפו) | `dist` | `vercel.json` בשורש |
 | `packages/web` | `dist` | `packages/web/vercel.json` |
+
+אחרי הבילד, `build:vercel` מעתיק אוטומטית את `packages/web/dist` → `dist` (סקריפט `scripts/vercel-sync-dist.mjs`).
 
 אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 
