@@ -1,0 +1,110 @@
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { getProjectFinancials } from "@nexus/shared";
+import type { Project, EVMMetrics, Task, TaskDependency } from "@nexus/shared";
+import { v4 as uuid } from "uuid";
+import { DataStoreService } from "../database/data-store.service";
+
+@Injectable()
+export class ProjectsService {
+  constructor(private readonly db: DataStoreService) {}
+
+  findAll(): Project[] {
+    return this.db.getProjects();
+  }
+
+  findOne(id: string): Project {
+    const p = this.db.getProject(id);
+    if (!p) throw new NotFoundException(`Project ${id} not found`);
+    return p;
+  }
+
+  create(dto: Partial<Project>) {
+    return this.db.createProject(dto);
+  }
+
+  async update(id: string, patch: Partial<Project>) {
+    const updated = await this.db.updateProject(id, patch);
+    if (!updated) throw new NotFoundException(`Project ${id} not found`);
+    return updated;
+  }
+
+  getEVM(projectId: string): EVMMetrics {
+    const project = this.findOne(projectId);
+    const tasks = this.db.getTasks(projectId);
+    const lines = this.db.getBudgetLines(projectId);
+    const assignments = this.db.getAssignments(projectId);
+    const resources = this.db.getResources(project.organizationId);
+    const timesheets = this.db.getTimesheets(projectId);
+    const members = this.db.getProjectMembers(projectId);
+    return getProjectFinancials({
+      projectId,
+      currency: project.currency,
+      budgetCap: project.budgetCap,
+      tasks,
+      lines,
+      assignments,
+      resources,
+      timesheets,
+      members,
+      hoursPerDay: project.hoursPerDay ?? 8,
+    }).evm;
+  }
+
+  async importProject(
+    projectId: string,
+    data: {
+      tasks?: Task[];
+      dependencies?: TaskDependency[];
+    },
+  ) {
+    this.findOne(projectId);
+    if (data.tasks?.length) {
+      const remapped = data.tasks.map((t) => ({
+        ...t,
+        id: uuid(),
+        projectId,
+      }));
+      const idMap = new Map(data.tasks.map((old, i) => [old.id, remapped[i].id]));
+      const tasks = remapped.map((t) => ({
+        ...t,
+        parentId: t.parentId ? (idMap.get(t.parentId) ?? null) : null,
+      }));
+      await this.db.bulkCreateTasks(projectId, tasks);
+      if (data.dependencies?.length) {
+        for (const d of data.dependencies) {
+          const pred = idMap.get(d.predecessorId);
+          const succ = idMap.get(d.successorId);
+          if (pred && succ) {
+            await this.db.addDependency({
+              ...d,
+              id: uuid(),
+              projectId,
+              predecessorId: pred,
+              successorId: succ,
+            });
+          }
+        }
+      }
+      return { importedTasks: tasks.length };
+    }
+    return { importedTasks: 0 };
+  }
+
+  async remove(id: string) {
+    const ok = await this.db.deleteProject(id);
+    if (!ok) throw new NotFoundException(`Project ${id} not found`);
+    return { deleted: true };
+  }
+
+  exportProject(projectId: string) {
+    const project = this.findOne(projectId);
+    return {
+      project,
+      tasks: this.db.getTasks(projectId),
+      dependencies: this.db.getDependencies(projectId),
+      baselines: this.db.getBaselines(projectId),
+      assignments: this.db.getAssignments(projectId),
+      exportedAt: new Date().toISOString(),
+    };
+  }
+}

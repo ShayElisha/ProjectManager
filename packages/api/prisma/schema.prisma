@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id              String     @id @default(uuid()) @map("_id")
+  name            String
+  defaultLocale   String     @default("he")
+  defaultCurrency String     @default("ILS")
+  projects        Project[]
+  resources       Resource[]
+}
+
+model Project {
+  id             String               @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  locale         String               @default("he")
+  currency       String               @default("ILS")
+  startDate      String
+  endDate        String?
+  status         String               @default("planning")
+  budgetCap      Float?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  tasks          Task[]
+  dependencies   TaskDependency[]
+  assignments    ResourceAssignment[]
+  baselines      Baseline[]
+  budgetLines    BudgetLineItem[]
+  risks          ProjectRisk[]
+  changeRequests ChangeRequest[]
+  rejectionLogs  RejectionLog[]
+}
+
+model Task {
+  id                  String   @id @default(uuid()) @map("_id")
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [id])
+  parentId            String?
+  wbs                 String
+  name                String
+  status              String
+  startDate           String
+  endDate             String
+  durationDays        Int
+  percentComplete     Float    @default(0)
+  isMilestone         Boolean  @default(false)
+  isSummary           Boolean  @default(false)
+  manuallyScheduled   Boolean  @default(false)
+  constraint          String   @default("ASAP")
+  constraintDate      String?
+  isCritical          Boolean  @default(false)
+  earlyStart          String?
+  earlyFinish         String?
+  lateStart           String?
+  lateFinish          String?
+  totalFloat          Int?
+  freeFloat           Int?
+  baselineStart       String?
+  baselineFinish      String?
+  plannedCost         Float?
+  actualCost          Float?
+  plannedLaborCost    Float?
+  actualLaborCost     Float?
+  plannedMaterialCost Float?
+  actualMaterialCost  Float?
+  plannedOtherCost    Float?
+  actualOtherCost     Float?
+  assigneeIds         Json     @default("[]")
+  sortOrder           Int      @default(0)
+  isPriority          Boolean  @default(false)
+  pausedAt            String?
+  pausedSegmentEnd    String?
+  resumeDate          String?
+  remainingWorkDays   Int?
+  pausedAssigneeId    String?
+  taskNotes           Json     @default("[]")
+}
+
+model TaskDependency {
+  id            String  @id @default(uuid()) @map("_id")
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id])
+  predecessorId String
+  successorId   String
+  type          String  @default("FS")
+  lagDays       Int     @default(0)
+}
+
+model Resource {
+  id             String               @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  name           String
+  type           String
+  email          String?
+  costPerHour    Float?
+  costPerUnit    Float?
+  maxUnits       Float                @default(1)
+  calendarId     String?
+  assignments    ResourceAssignment[]
+}
+
+model ResourceAssignment {
+  id         String   @id @default(uuid()) @map("_id")
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+  taskId     String
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  units      Float    @default(1)
+  workHours  Float
+}
+
+model Baseline {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  index     Int
+  name      String
+  savedAt   DateTime @default(now())
+  tasks     Json
+}
+
+model TimesheetEntry {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  userId    String
+  taskId    String
+  date      String
+  hours     Float
+  status    String   @default("draft")
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model BudgetLineItem {
+  id            String  @id @default(uuid()) @map("_id")
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id])
+  category      String
+  name          String
+  description   String?
+  plannedAmount    Float   @default(0)
+  committedAmount  Float?
+  actualAmount     Float   @default(0)
+  cashMonth        String
+  taskId           String?
+  source           String?
+  sourceRef        String?
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @map("_id")
+  userId    String
+  type      String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  metadata  Json?
+}
+
+model ProjectMember {
+  id          String @id @default(uuid()) @map("_id")
+  projectId   String
+  resourceId  String
+  role        String
+  hoursPerDay Int?
+}
+
+model ProjectRisk {
+  id                String   @id @default(uuid()) @map("_id")
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id])
+  title             String
+  description       String?
+  category          String   @default("schedule")
+  probability       String
+  impact            String
+  riskScore         Int      @default(4)
+  status            String   @default("open")
+  source            String   @default("manual")
+  ownerResourceId   String?
+  responsePlan      String?
+  taskId            String?
+  dedupeKey         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ChangeRequest {
+  id                  String    @id @default(uuid()) @map("_id")
+  projectId           String
+  project             Project   @relation(fields: [projectId], references: [id])
+  title               String
+  description         String?
+  impactScheduleDays  Int       @default(0)
+  impactCost          Float     @default(0)
+  status              String    @default("draft")
+  requestedBy         String?
+  decidedAt           DateTime?
+  decisionNote        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model RejectionLog {
+  id                  String   @id @default(uuid()) @map("_id")
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [id])
+  title               String
+  description         String?
+  category            String   @default("other")
+  rejectedAt          String
+  decisionNote        String?
+  impactScheduleDays  Int?
+  impactCost          Float?
+  taskId              String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
