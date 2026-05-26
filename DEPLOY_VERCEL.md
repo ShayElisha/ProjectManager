@@ -45,7 +45,7 @@ vercel --prod
 | שדה | ערך |
 |-----|-----|
 | **Root Directory** | `packages/web` |
-| **Output Directory** | `public` |
+| **Output Directory** | `dist` |
 | **Framework Preset** | Other |
 | **Build Command** | ריק (נלקח מ-`packages/web/vercel.json`) |
 | **Install Command** | ריק |
@@ -58,7 +58,7 @@ vercel --prod
 > Vercel מריץ פקודות מתוך **Root Directory** (למשל `packages/web`). הסקריפט `build:vercel` מוגדר רק ב-`package.json` **של שורש המונורפו**.  
 > פתרון: תמיד `pnpm -w run build:vercel` (`-w` = workspace root), או Override ב-Dashboard שמצביע על הסקריפט הזה — **לא** `pnpm run build:vercel` בלי `-w`.
 
-קובץ הגדרות לפריסה: `packages/web/vercel.json` (`outputDirectory: public`, API ב-`packages/web/api/`).
+קובץ הגדרות: `packages/web/vercel.json` (`outputDirectory: dist` — פלט ישיר מ-Vite, API ב-`packages/web/api/`).
 
 > **Output Directory ב-Dashboard:** מחק `public` / `dist` ידניים — `vercel.json` קובע (`dist` או `packages/web/dist`). אם חייבים להשאיר `public`, הבילד מעתיק גם לשם אוטומטית.
 

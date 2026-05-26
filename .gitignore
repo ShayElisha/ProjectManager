@@ -3,7 +3,6 @@ node_modules
 # Repo-root artifacts only (/prefix). Never bare "dist" or "public" — matches packages/web/public too.
 /dist
 /public
-packages/web/dist
 packages/shared/dist
 packages/api/dist
 api/nest

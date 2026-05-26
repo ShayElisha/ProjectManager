@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "build:vercel": "pnpm --filter @nexus/shared build && pnpm --filter @nexus/api build && pnpm --filter @nexus/web build && node scripts/vercel-prepare.mjs",
+    "build:vercel": "bash scripts/vercel-build.sh",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"
   },
