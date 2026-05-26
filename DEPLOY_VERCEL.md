@@ -57,8 +57,8 @@ vercel --prod
 ## מבנה הפריסה
 
 ```
-vercel.json          → build + SPA fallback
-api/[[...path]].ts   → כל בקשות /api/*
+vercel.json          → build + SPA fallback + rewrite ל-API
+api/index.ts         → כל בקשות /api/* (לא [[...path]] — לא נתמך מחוץ ל-Next.js)
 packages/web/dist    → React SPA
 packages/api/dist    → NestJS (serverless-http)
 ```
