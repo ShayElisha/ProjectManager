@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build:vercel": "pnpm -w run build:vercel",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node ./scripts/sync-public.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

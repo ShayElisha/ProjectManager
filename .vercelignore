@@ -1,3 +1,0 @@
-# Vercel applies gitignore when packaging build output. Allow frontend deploy dirs:
-!packages/web/public
-!packages/web/dist
