@@ -628,6 +628,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   connectRealtime: (projectId) => {
+    const socketEnabled =
+      import.meta.env.DEV || import.meta.env.VITE_ENABLE_SOCKET === "true";
+    if (!socketEnabled) return;
+
     get().socket?.disconnect();
     set({ socketConnected: false });
     const socket = io("/", { path: "/socket.io", transports: ["websocket"] });

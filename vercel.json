@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm run build:vercel",
+  "outputDirectory": "packages/web/dist",
+  "framework": null,
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": "packages/api/dist/**,packages/api/prisma/**,node_modules/.prisma/**,node_modules/@prisma/client/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ]
+}

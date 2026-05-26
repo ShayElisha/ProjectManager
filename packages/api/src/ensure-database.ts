@@ -41,6 +41,16 @@ function clearStaleLock(dataDir: string) {
 /** Starts or reuses embedded MongoDB replica set when no Atlas/hosted URL is configured. */
 export async function ensureDatabaseUrl(): Promise<void> {
   const url = process.env.DATABASE_URL?.trim() ?? "";
+
+  if (process.env.VERCEL) {
+    if (!url) {
+      throw new Error(
+        "DATABASE_URL is required on Vercel. Set MongoDB Atlas connection string in project Environment Variables.",
+      );
+    }
+    return;
+  }
+
   if (url.startsWith("mongodb+srv://") || url.includes("mongodb.net")) return;
   if (process.env.USE_EMBEDDED_MONGO !== "true") return;
 
