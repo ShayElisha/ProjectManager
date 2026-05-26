@@ -56,12 +56,13 @@ vercel --prod
 
 **Root Directory** — בחר **אחד** (לא לערבב):
 
-| Root Directory | Output Directory | קובץ הגדרות |
-|----------------|------------------|-------------|
-| ריק (שורש הריפו) | `packages/web/dist` | `vercel.json` בשורש |
-| `packages/web` | `dist` | `packages/web/vercel.json` |
+| Root Directory | Output Directory (Dashboard) | קובץ הגדרות |
+|----------------|------------------------------|-------------|
+| **ריק** (שורש הריפו) | `packages/web/public` | `vercel.json` בשורש |
+| **`packages/web`** | `public` | `packages/web/vercel.json` |
 
-> אם Root = `packages/web` אבל Output בשורש מוגדר כ-`packages/web/dist` — Vercel יחפש `packages/web/packages/web/dist` ויכשל. השאר Output **ריק** ב-Dashboard.
+> **לא** להגדיר Output = `public` כש-Root Directory **ריק** — Vercel יחפש `/public` בשורש (מוסתר ב-`.gitignore`).  
+> או: Root = `packages/web` + Output = `public` (הכי פשוט).
 
 > **Output Directory ב-Dashboard:** מחק `public` / `dist` ידניים — `vercel.json` קובע (`dist` או `packages/web/dist`). אם חייבים להשאיר `public`, הבילד מעתיק גם לשם אוטומטית.
 
