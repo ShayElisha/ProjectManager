@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,13 +20,7 @@ function findWebBuildOutput() {
 
 const webBuilt = findWebBuildOutput();
 if (!webBuilt) {
-  console.error(
-    "[vercel-prepare] No frontend build found.",
-    "Checked:",
-    resolve(monorepoRoot, "packages/web/dist"),
-    resolve(monorepoRoot, "dist"),
-    resolve(cwd, "dist"),
-  );
+  console.error("[vercel-prepare] No frontend build found (index.html missing).");
   process.exit(1);
 }
 
@@ -38,43 +32,68 @@ if (!existsSync(apiDist)) {
   process.exit(1);
 }
 
-function bundleApiForHandler(apiDir) {
-  const nestDir = resolve(apiDir, "nest");
-  rmSync(nestDir, { recursive: true, force: true });
-  mkdirSync(nestDir, { recursive: true });
-  cpSync(apiDist, nestDir, { recursive: true });
-  cpSync(apiPrisma, resolve(nestDir, "prisma"), { recursive: true });
-  console.log(`[vercel-prepare] API bundle → ${nestDir}`);
+/** @param {string} outputRoot */
+function writeBuildOutputApi(outputRoot) {
+  const root = resolve(outputRoot);
+  const staticDir = resolve(root, "static");
+  const apiFuncDir = resolve(root, "functions/api.func");
+
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(staticDir, { recursive: true });
+  cpSync(webBuilt, staticDir, { recursive: true });
+
+  mkdirSync(apiFuncDir, { recursive: true });
+  cpSync(apiDist, resolve(apiFuncDir, "nest"), { recursive: true });
+  cpSync(apiPrisma, resolve(apiFuncDir, "nest/prisma"), { recursive: true });
+
+  writeFileSync(
+    resolve(apiFuncDir, "index.js"),
+    `'use strict';
+const mod = require('./nest/serverless.js');
+module.exports = mod.default;
+`,
+  );
+
+  writeFileSync(
+    resolve(apiFuncDir, ".vc-config.json"),
+    `${JSON.stringify(
+      {
+        runtime: "nodejs20.x",
+        handler: "index",
+        launcherType: "Nodejs",
+        maxDuration: 60,
+        memory: 1024,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  writeFileSync(
+    resolve(root, "config.json"),
+    `${JSON.stringify(
+      {
+        version: 3,
+        routes: [
+          { src: "/api/(.*)", dest: "/api" },
+          { handle: "filesystem" },
+          { src: "/(.*)", dest: "/index.html" },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  console.log(`[vercel-prepare] Build Output API → ${root}`);
 }
 
-function mirrorWebDist(targetDir) {
-  const target = resolve(targetDir);
-  const source = resolve(webBuilt);
-  if (target === source) {
-    console.log(`[vercel-prepare] Web dist OK at ${target}`);
-    return;
-  }
-  rmSync(target, { recursive: true, force: true });
-  mkdirSync(dirname(target), { recursive: true });
-  cpSync(source, target, { recursive: true });
-  console.log(`[vercel-prepare] Web dist → ${target}`);
+const outputTargets = new Set([
+  resolve(monorepoRoot, ".vercel/output"),
+  resolve(monorepoRoot, "packages/web/.vercel/output"),
+  resolve(cwd, ".vercel/output"),
+]);
+
+for (const target of outputTargets) {
+  writeBuildOutputApi(target);
 }
-
-bundleApiForHandler(resolve(monorepoRoot, "api"));
-bundleApiForHandler(resolve(monorepoRoot, "packages/web/api"));
-
-const outputDirs = [
-  resolve(monorepoRoot, "packages/web/dist"),
-  resolve(monorepoRoot, "dist"),
-  resolve(monorepoRoot, "public"),
-  resolve(monorepoRoot, "packages/web/public"),
-  resolve(cwd, "dist"),
-  resolve(cwd, "public"),
-];
-
-for (const dir of outputDirs) {
-  mirrorWebDist(dir);
-}
-
-const verified = outputDirs.filter((d) => existsSync(resolve(d, "index.html")));
-console.log(`[vercel-prepare] index.html present in ${verified.length} output dir(s)`);
