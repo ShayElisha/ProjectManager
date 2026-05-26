@@ -1,12 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install --frozen-lockfile",
+  "installCommand": "MONGOMS_DISABLE_POSTINSTALL=1 PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --frozen-lockfile",
   "buildCommand": "pnpm -w run build:vercel",
   "framework": null,
   "build": {
     "env": {
       "DATABASE_URL": "mongodb://127.0.0.1:27017/nexus_build?directConnection=true",
-      "VERCEL": "1"
+      "VERCEL": "1",
+      "MONGOMS_DISABLE_POSTINSTALL": "1",
+      "PRISMA_SKIP_POSTINSTALL_GENERATE": "1"
     }
   }
 }

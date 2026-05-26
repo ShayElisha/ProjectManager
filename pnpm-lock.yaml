@@ -50,9 +50,6 @@ importers:
       mongodb:
         specifier: ^7.2.0
         version: 7.2.0
-      mongodb-memory-server:
-        specifier: ^11.1.0
-        version: 11.1.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -84,6 +81,9 @@ importers:
       '@types/uuid':
         specifier: ^10.0.0
         version: 10.0.0
+      mongodb-memory-server:
+        specifier: ^11.1.0
+        version: 11.1.0
       prisma:
         specifier: ^6.6.0
         version: 6.19.3(typescript@5.9.3)

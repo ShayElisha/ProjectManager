@@ -6,7 +6,9 @@
     "PORT",
     "VERCEL",
     "VERCEL_URL",
-    "CORS_ORIGINS"
+    "CORS_ORIGINS",
+    "MONGOMS_DISABLE_POSTINSTALL",
+    "PRISMA_SKIP_POSTINSTALL_GENERATE"
   ],
   "tasks": {
     "build": {

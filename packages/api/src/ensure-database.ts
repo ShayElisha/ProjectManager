@@ -1,13 +1,12 @@
 import { existsSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { MongoClient } from "mongodb";
-import { MongoMemoryReplSet } from "mongodb-memory-server";
 
 const EMBEDDED_PORT = 27027;
 const DB_NAME = "nexus_project";
 const REPLICA_SET = "rs0";
 
-let replSet: MongoMemoryReplSet | undefined;
+let replSet: { waitUntilRunning: () => Promise<void>; stop: () => Promise<unknown> } | undefined;
 let startedByProcess = false;
 
 function embeddedUrl(): string {
@@ -62,7 +61,8 @@ export async function ensureDatabaseUrl(): Promise<void> {
   const dataDir = resolve(__dirname, "../data/mongo");
   clearStaleLock(dataDir);
 
-  replSet = await MongoMemoryReplSet.create({
+  const { MongoMemoryReplSet } = await import("mongodb-memory-server");
+  const started = await MongoMemoryReplSet.create({
     instanceOpts: [
       {
         dbPath: dataDir,
@@ -78,7 +78,8 @@ export async function ensureDatabaseUrl(): Promise<void> {
       ip: "127.0.0.1",
     },
   });
-  await replSet.waitUntilRunning();
+  replSet = started;
+  await started.waitUntilRunning();
   startedByProcess = true;
 
   process.env.DATABASE_URL = embeddedUrl();

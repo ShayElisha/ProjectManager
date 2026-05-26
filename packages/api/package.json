@@ -11,8 +11,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:clear": "node prisma/clear-all.mjs",
-    "db:migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.12",
@@ -26,7 +25,6 @@
     "class-validator": "^0.14.1",
     "dotenv": "^17.4.2",
     "mongodb": "^7.2.0",
-    "mongodb-memory-server": "^11.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "serverless-http": "^3.2.0",
@@ -34,6 +32,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^11.1.0",
     "@nestjs/cli": "^11.0.5",
     "@nestjs/schematics": "^11.0.2",
     "@types/express": "^5.0.1",
