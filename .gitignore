@@ -1,5 +1,7 @@
 node_modules
 dist
+public
+packages/web/public
 api/nest
 packages/web/api/nest
 .turbo

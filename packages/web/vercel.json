@@ -1,32 +1,25 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    },
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60,
-        "memory": 1024,
-        "includeFiles": "api/nest/**"
-      }
-    }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.ts" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ],
+  "buildCommand": "cd ../.. && pnpm run build:vercel",
+  "outputDirectory": "dist",
+  "framework": null,
   "build": {
     "env": {
       "DATABASE_URL": "mongodb://127.0.0.1:27017/nexus_build?directConnection=true",
       "VERCEL": "1"
     }
-  }
+  },
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": "api/nest/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api", "destination": "/api/index.ts" },
+    { "source": "/api/(.*)", "destination": "/api/index.ts" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

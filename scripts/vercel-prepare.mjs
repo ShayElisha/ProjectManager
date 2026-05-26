@@ -28,11 +28,15 @@ function bundleApiForHandler(apiDir) {
   console.log(`[vercel-prepare] API bundle → ${nestDir}`);
 }
 
+function mirrorDist(targetDir) {
+  rmSync(targetDir, { recursive: true, force: true });
+  cpSync(webDist, targetDir, { recursive: true });
+  console.log(`[vercel-prepare] Web dist → ${targetDir}`);
+}
+
 bundleApiForHandler(resolve(monorepoRoot, "api"));
 bundleApiForHandler(resolve(monorepoRoot, "packages/web/api"));
 
-const repoDist = resolve(monorepoRoot, "dist");
-
-rmSync(repoDist, { recursive: true, force: true });
-cpSync(webDist, repoDist, { recursive: true });
-console.log(`[vercel-prepare] Web dist → ${repoDist}`);
+mirrorDist(resolve(monorepoRoot, "dist"));
+mirrorDist(resolve(monorepoRoot, "public"));
+mirrorDist(resolve(monorepoRoot, "packages/web/public"));

@@ -45,7 +45,7 @@ vercel --prod
 | ריק (שורש הריפו) | `vercel.json` בשורש |
 | `packages/web` | `packages/web/vercel.json` |
 
-> **אל תגדיר Output Directory ידנית ב-Dashboard** — השאר ריק. `outputDirectory` ב-`vercel.json` הוסר; הפריסה משתמשת ב-`@vercel/static-build` + `@vercel/node`.
+> **Output Directory ב-Dashboard:** מחק `public` / `dist` ידניים — `vercel.json` קובע (`dist` או `packages/web/dist`). אם חייבים להשאיר `public`, הבילד מעתיק גם לשם אוטומטית.
 
 **Production URL:** בדוק ב-Vercel → Domains את הדומיין האמיתי (למשל `core-pilote.vercel.app`). אם `/` מחזיר `404 NOT_FOUND`, הבילד לא העלה קבצים סטטיים.
 

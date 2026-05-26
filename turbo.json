@@ -1,9 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "DATABASE_URL",
+    "USE_EMBEDDED_MONGO",
+    "PORT",
+    "VERCEL",
+    "VERCEL_URL",
+    "CORS_ORIGINS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".vercel/**", "api/nest/**", "packages/web/api/nest/**"]
+      "outputs": ["dist/**", ".vercel/**", "api/nest/**", "packages/web/api/nest/**"],
+      "env": ["DATABASE_URL", "USE_EMBEDDED_MONGO", "PORT", "VERCEL"]
     },
     "dev": {
       "cache": false,
