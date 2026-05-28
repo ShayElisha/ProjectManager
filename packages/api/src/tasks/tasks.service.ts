@@ -18,6 +18,7 @@ import type { Task, TaskDependency } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { runAutomationRules } from "../automation/automation.runner";
+import { runOrgAutomationRules } from "../automation/org-automation.runner";
 import { WebhookDispatcherService } from "../integrations/webhook-dispatcher.service";
 
 @Injectable()
@@ -130,6 +131,14 @@ export class TasksService {
 
     const updated = await this.db.updateTask(projectId, taskId, merged);
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
+
+    const project = this.db.getProject(projectId);
+    if (project) {
+      runOrgAutomationRules(this.db, project.organizationId, "task.updated", {
+        projectId,
+        task: updated,
+      });
+    }
 
     this.db.logActivity({
       projectId,

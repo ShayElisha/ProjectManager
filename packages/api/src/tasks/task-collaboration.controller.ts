@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Req,
   Res,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -16,6 +19,8 @@ import type { Response } from "express";
 import { IsOptional, IsString } from "class-validator";
 import type { UserAccount } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
+import { assertProjectAccess } from "../common/org-access";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { diskStorage } from "multer";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
@@ -114,14 +119,25 @@ export class TaskCollaborationController {
 }
 
 @Controller("attachments")
+@UseGuards(JwtAuthGuard)
 export class AttachmentsDownloadController {
   constructor(private readonly db: DataStoreService) {}
 
   @Get(":attachmentId/download")
-  download(@Param("attachmentId") id: string, @Res() res: Response) {
+  download(
+    @Req() req: { user: UserAccount },
+    @Param("attachmentId") id: string,
+    @Res() res: Response,
+  ) {
     const meta = this.db.getAttachmentById(id);
     if (!meta) {
       res.status(404).send("Not found");
+      return;
+    }
+    try {
+      assertProjectAccess(this.db, req.user, meta.projectId);
+    } catch {
+      res.status(403).send("Forbidden");
       return;
     }
     const path = join(UPLOAD_DIR, meta.storagePath!);

@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2, X } from "lucide-react";
-import type { DependencyType, IssueType, Task, TaskDependency } from "@nexus/shared";
+import type { DependencyType, IssueType, ScheduleConstraint, Task, TaskDependency } from "@nexus/shared";
+
+const CONSTRAINTS: ScheduleConstraint[] = [
+  "ASAP",
+  "ALAP",
+  "MSO",
+  "MFO",
+  "SNET",
+  "SNLT",
+  "FNET",
+  "FNLT",
+];
 import { api } from "@/lib/api";
 import { daysBetween } from "@/lib/dependency-anchors";
 import { tasksAlreadyLinked } from "@/lib/link-rules";
@@ -349,6 +360,38 @@ export function TaskDetailDrawer({ taskId, onClose }: Props) {
               </p>
             )}
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="text-[var(--muted)]">{t("task.constraint")}</span>
+              <select
+                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
+                value={draft.constraint ?? task.constraint ?? "ASAP"}
+                onChange={(e) =>
+                  setDraft({ ...draft, constraint: e.target.value as ScheduleConstraint })
+                }
+              >
+                {CONSTRAINTS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-[var(--muted)]">{t("task.constraintDate")}</span>
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
+                value={draft.constraintDate ?? task.constraintDate ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    constraintDate: e.target.value || undefined,
+                  })
+                }
+              />
+            </label>
+          </div>
           <label className="block text-sm">
             <span className="text-[var(--muted)]">{t("task.assignee")}</span>
             <select

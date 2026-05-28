@@ -155,7 +155,8 @@
     "manuallyScheduled": "תזמון ידני",
     "priority": "עדיפות",
     "newTaskPlaceholder": "שם משימה חדשה...",
-    "constraint": "אילוץ",
+    "constraint": "אילוץ לוח זמנים",
+    "constraintDate": "תאריך אילוץ",
     "assignees": "משויכים",
     "predecessors": "קודמות",
     "subtasks": "תתי משימות",
@@ -723,8 +724,16 @@
       "crm": "CRM",
       "automation": "אוטומציה ארגונית",
       "billing": "חיוב",
+      "proofing": "אישור עיצוב",
       "security": "אבטחה"
-    }
+    },
+    "selectProject": "בחרו פרויקט בתפריט הראשי לניהול אישורים.",
+    "proofTitle": "כותרת הוכחה",
+    "approve": "אשר",
+    "reject": "דחה",
+    "permUserId": "מזהה משתמש",
+    "permTaskId": "מזהה משימה",
+    "grantPerm": "הענק גישה"
   },
   "integrations": {
     "title": "אינטגרציות",

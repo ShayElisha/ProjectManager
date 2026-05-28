@@ -155,7 +155,8 @@
     "manuallyScheduled": "Manually scheduled",
     "priority": "Priority",
     "newTaskPlaceholder": "New task name...",
-    "constraint": "Constraint",
+    "constraint": "Schedule constraint",
+    "constraintDate": "Constraint date",
     "assignees": "Assignees",
     "predecessors": "Predecessors",
     "subtasks": "Sub-tasks",
@@ -723,8 +724,16 @@
       "crm": "CRM",
       "automation": "Org automation",
       "billing": "Billing",
+      "proofing": "Proofing",
       "security": "Security"
-    }
+    },
+    "selectProject": "Select a project in the main nav to manage proofs.",
+    "proofTitle": "Proof title",
+    "approve": "Approve",
+    "reject": "Reject",
+    "permUserId": "User ID",
+    "permTaskId": "Task ID",
+    "grantPerm": "Grant access"
   },
   "integrations": {
     "title": "Integrations",

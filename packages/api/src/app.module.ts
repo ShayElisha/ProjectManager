@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { AuthModule } from "./auth/auth.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { SearchModule } from "./search/search.module";
@@ -22,10 +23,12 @@ import { IntegrationsModule } from "./integrations/integrations.module";
 import { ExportModule } from "./export/export.module";
 import { AuditModule } from "./audit/audit.module";
 import { EnterpriseModule } from "./enterprise/enterprise.module";
+import { ProjectAccessInterceptor } from "./common/project-access.interceptor";
 
 const realtimeModules = process.env.VERCEL ? [] : [RealtimeModule];
 
 @Module({
+  providers: [{ provide: APP_INTERCEPTOR, useClass: ProjectAccessInterceptor }],
   imports: [
     DatabaseModule,
     AuditModule,

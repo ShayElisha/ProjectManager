@@ -33,6 +33,8 @@ import type {
   ProjectMessage,
   ProjectWikiPage,
   ProjectGuest,
+  CustomReport,
+  WebhookSubscription,
 } from "@nexus/shared";
 import type { StoredUserRecord } from "./in-memory.backend";
 import { riskScore as calcRiskScore } from "@nexus/shared";
@@ -367,6 +369,25 @@ export class DataStoreService implements OnApplicationBootstrap {
       });
     }
 
+    try {
+      const dbUsers = await this.prisma.user.findMany();
+      for (const u of dbUsers) {
+        this.mem.users.set(u.id, {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role as UserRole,
+          organizationId: u.organizationId ?? undefined,
+          passwordHash: u.passwordHash,
+          totpSecret: u.totpSecret ?? undefined,
+          totpEnabled: u.totpEnabled ?? false,
+        });
+        this.mem.usersByEmail.set(u.email, u.id);
+      }
+    } catch {
+      /* users table may be empty on first deploy */
+    }
+
     const data = buildSeedData();
     data.organizationId = org.id;
     data.organizationName = org.name;
@@ -510,7 +531,10 @@ export class DataStoreService implements OnApplicationBootstrap {
       } catch {
         if (!this.mem.rejectionLogs.has(p.id)) this.mem.rejectionLogs.set(p.id, []);
       }
+      await this.hydrateProjectFeatures(p.id);
     }
+
+    await this.hydrateEnterpriseFromDb(org.id);
 
     this.mem.loadFromSeedData(data);
     const sheets = await this.prisma.timesheetEntry.findMany();
@@ -535,6 +559,281 @@ export class DataStoreService implements OnApplicationBootstrap {
       createdAt: n.createdAt.toISOString(),
       metadata: (n.metadata as Record<string, string>) ?? undefined,
     }));
+  }
+
+  private async hydrateProjectFeatures(projectId: string): Promise<void> {
+    try {
+      const comments = await this.prisma.taskComment.findMany({ where: { projectId } });
+      for (const c of comments) {
+        if (!this.mem.taskComments.some((x) => x.id === c.id)) {
+          this.mem.taskComments.push({
+            id: c.id,
+            projectId: c.projectId,
+            taskId: c.taskId,
+            userId: c.userId,
+            userName: c.userName,
+            body: c.body,
+            createdAt: c.createdAt.toISOString(),
+          });
+        }
+      }
+      const attachments = await this.prisma.taskAttachment.findMany({ where: { projectId } });
+      for (const a of attachments) {
+        if (!this.mem.taskAttachments.some((x) => x.id === a.id)) {
+          this.mem.taskAttachments.push({
+            id: a.id,
+            projectId: a.projectId,
+            taskId: a.taskId,
+            fileName: a.fileName,
+            mimeType: a.mimeType,
+            sizeBytes: a.sizeBytes,
+            storagePath: a.storagePath,
+            uploadedBy: a.uploadedBy ?? undefined,
+            createdAt: a.createdAt.toISOString(),
+          });
+        }
+      }
+      const savedViews = await this.prisma.savedView.findMany({ where: { projectId } });
+      this.mem.savedViews.set(
+        projectId,
+        savedViews.map((v) => ({
+          id: v.id,
+          projectId: v.projectId,
+          userId: v.userId ?? undefined,
+          name: v.name,
+          viewMode: v.viewMode as SavedView["viewMode"],
+          filters: v.filters as SavedView["filters"],
+          columns: (v.columns as SavedView["columns"]) ?? undefined,
+        })),
+      );
+      const rules = await this.prisma.automationRule.findMany({ where: { projectId } });
+      this.mem.automationRules.set(
+        projectId,
+        rules.map((r) => ({
+          id: r.id,
+          projectId: r.projectId,
+          name: r.name,
+          enabled: r.enabled,
+          triggerField: r.triggerField,
+          triggerOp: r.triggerOp as AutomationRule["triggerOp"],
+          triggerValue: r.triggerValue as AutomationRule["triggerValue"],
+          actionType: r.actionType as AutomationRule["actionType"],
+          actionPayload: r.actionPayload as AutomationRule["actionPayload"],
+        })),
+      );
+      const logs = await this.prisma.activityLog.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      });
+      this.mem.activityLogs.set(
+        projectId,
+        logs.map((l) => ({
+          id: l.id,
+          projectId: l.projectId,
+          userId: l.userId ?? undefined,
+          userName: l.userName ?? undefined,
+          action: l.action,
+          entityType: l.entityType,
+          entityId: l.entityId ?? undefined,
+          summary: l.summary,
+          createdAt: l.createdAt.toISOString(),
+        })),
+      );
+      const messages = await this.prisma.projectMessage.findMany({ where: { projectId } });
+      this.mem.projectMessages.set(
+        projectId,
+        messages.map((m) => ({
+          id: m.id,
+          projectId: m.projectId,
+          userId: m.userId,
+          userName: m.userName,
+          body: m.body,
+          createdAt: m.createdAt.toISOString(),
+        })),
+      );
+      const wiki = await this.prisma.projectWikiPage.findMany({ where: { projectId } });
+      this.mem.wikiPages.set(
+        projectId,
+        wiki.map((w) => ({
+          id: w.id,
+          projectId: w.projectId,
+          title: w.title,
+          content: w.content,
+          updatedAt: w.updatedAt.toISOString(),
+        })),
+      );
+      const guests = await this.prisma.projectGuest.findMany({ where: { projectId } });
+      this.mem.projectGuests.set(
+        projectId,
+        guests.map((g) => ({
+          id: g.id,
+          projectId: g.projectId,
+          email: g.email,
+          name: g.name ?? undefined,
+          role: g.role as ProjectGuest["role"],
+          token: g.token,
+          createdAt: g.createdAt.toISOString(),
+        })),
+      );
+      const reports = await this.prisma.customReport.findMany({ where: { projectId } });
+      this.mem.customReports.set(
+        projectId,
+        reports.map((r) => ({
+          id: r.id,
+          projectId: r.projectId,
+          name: r.name,
+          widgets: r.widgets as CustomReport["widgets"],
+          createdAt: r.createdAt.toISOString(),
+        })),
+      );
+      const hooks = await this.prisma.webhookSubscription.findMany({ where: { projectId } });
+      this.mem.webhookSubscriptions.set(
+        projectId,
+        hooks.map((h) => ({
+          id: h.id,
+          projectId: h.projectId,
+          url: h.url,
+          events: h.events as WebhookSubscription["events"],
+          secret: h.secret ?? undefined,
+          enabled: h.enabled,
+        })),
+      );
+      const goals = await this.prisma.goal.findMany({ where: { projectId } });
+      this.mem.goals.set(
+        projectId,
+        goals.map((g) => ({
+          id: g.id,
+          projectId: g.projectId,
+          title: g.title,
+          period: g.period,
+          progress: g.progress,
+        })),
+      );
+      const krs = await this.prisma.keyResult.findMany({ where: { projectId } });
+      this.mem.keyResults.set(
+        projectId,
+        krs.map((k) => ({
+          id: k.id,
+          goalId: k.goalId,
+          projectId: k.projectId,
+          title: k.title,
+          targetValue: k.targetValue,
+          currentValue: k.currentValue,
+          unit: k.unit ?? undefined,
+        })),
+      );
+      const wb = await this.prisma.whiteboardItem.findMany({ where: { projectId } });
+      this.mem.whiteboardItems.set(
+        projectId,
+        wb.map((w) => ({
+          id: w.id,
+          projectId: w.projectId,
+          x: w.x,
+          y: w.y,
+          width: w.width,
+          height: w.height,
+          text: w.text,
+          color: w.color,
+        })),
+      );
+    } catch (err) {
+      this.logger.warn(`hydrateProjectFeatures(${projectId}): ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  private async hydrateEnterpriseFromDb(organizationId: string): Promise<void> {
+    try {
+      const audits = await this.prisma.auditLog.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      });
+      this.mem.auditLogs = audits.map((a) => ({
+        id: a.id,
+        organizationId: a.organizationId,
+        userId: a.userId ?? undefined,
+        userName: a.userName ?? undefined,
+        action: a.action,
+        entityType: a.entityType,
+        entityId: a.entityId ?? undefined,
+        summary: a.summary,
+        metadata: (a.metadata as Record<string, unknown>) ?? undefined,
+        createdAt: a.createdAt.toISOString(),
+      }));
+      const programs = await this.prisma.program.findMany({ where: { organizationId } });
+      this.mem.programs = programs.map((p) => ({
+        id: p.id,
+        organizationId: p.organizationId,
+        name: p.name,
+        description: p.description ?? undefined,
+        projectIds: (p.projectIds as string[]) ?? [],
+        startDate: p.startDate ?? undefined,
+        endDate: p.endDate ?? undefined,
+      }));
+      const invoices = await this.prisma.invoice.findMany({ where: { organizationId } });
+      this.mem.invoices = invoices.map((i) => ({
+        id: i.id,
+        organizationId: i.organizationId,
+        projectId: i.projectId ?? undefined,
+        clientName: i.clientName,
+        clientEmail: i.clientEmail ?? undefined,
+        status: i.status as import("@nexus/shared").Invoice["status"],
+        currency: i.currency,
+        lines: i.lines as unknown as import("@nexus/shared").InvoiceLine[],
+        total: i.total,
+        dueDate: i.dueDate ?? undefined,
+        createdAt: i.createdAt.toISOString(),
+      }));
+      const contacts = await this.prisma.crmContact.findMany({ where: { organizationId } });
+      this.mem.crmContacts = contacts.map((c) => ({ ...c, email: c.email ?? undefined, company: c.company ?? undefined, phone: c.phone ?? undefined }));
+      const deals = await this.prisma.crmDeal.findMany({ where: { organizationId } });
+      this.mem.crmDeals = deals.map((d) => ({
+        id: d.id,
+        organizationId: d.organizationId,
+        contactId: d.contactId ?? undefined,
+        title: d.title,
+        value: d.value,
+        stage: d.stage as import("@nexus/shared").CrmDeal["stage"],
+        projectId: d.projectId ?? undefined,
+      }));
+      const orgRules = await this.prisma.orgAutomationRule.findMany({ where: { organizationId } });
+      this.mem.orgAutomationRules = orgRules.map((r) => ({
+        id: r.id,
+        organizationId: r.organizationId,
+        name: r.name,
+        enabled: r.enabled,
+        event: r.event,
+        actionType: r.actionType as import("@nexus/shared").OrgAutomationRule["actionType"],
+        actionPayload: r.actionPayload as Record<string, unknown> | undefined,
+      }));
+      const proofs = await this.prisma.proofAsset.findMany();
+      this.mem.proofAssets = proofs
+        .filter((p) => {
+          const proj = this.mem.projects.get(p.projectId);
+          return proj?.organizationId === organizationId;
+        })
+        .map((p) => ({
+          id: p.id,
+          projectId: p.projectId,
+          taskId: p.taskId ?? undefined,
+          title: p.title,
+          fileUrl: p.fileUrl ?? undefined,
+          status: p.status as import("@nexus/shared").ProofAsset["status"],
+          reviewerNote: p.reviewerNote ?? undefined,
+          createdAt: p.createdAt.toISOString(),
+        }));
+      const perms = await this.prisma.taskPermission.findMany();
+      this.mem.taskPermissions = perms.map((p) => ({
+        id: p.id,
+        projectId: p.projectId,
+        taskId: p.taskId,
+        userId: p.userId,
+        level: p.level as import("@nexus/shared").TaskPermissionLevel,
+      }));
+    } catch (err) {
+      this.logger.warn(`hydrateEnterpriseFromDb: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   private async persistTask(task: Task) {
@@ -697,6 +996,59 @@ export class DataStoreService implements OnApplicationBootstrap {
     return account;
   }
 
+  getUsersByOrganization(organizationId: string): UserAccount[] {
+    return Array.from(this.mem.users.values())
+      .filter((u) => u.organizationId === organizationId)
+      .map(({ passwordHash: _p, ...account }) => account);
+  }
+
+  resolveMentionUserIds(projectId: string, mentionName: string): string[] {
+    const needle = mentionName.trim().toLowerCase();
+    if (!needle) return [];
+    const project = this.getProject(projectId);
+    if (!project) return [];
+    const members = this.getProjectMembers(projectId);
+    const resources = this.getResources(project.organizationId);
+    const ids = new Set<string>();
+    for (const m of members) {
+      const res = resources.find((r) => r.id === m.resourceId);
+      if (res?.name.toLowerCase().includes(needle)) {
+        const user = Array.from(this.mem.users.values()).find(
+          (u) => u.email.split("@")[0]!.toLowerCase() === needle || u.name.toLowerCase().includes(needle),
+        );
+        if (user) ids.add(user.id);
+      }
+    }
+    for (const u of this.mem.users.values()) {
+      if (u.organizationId !== project.organizationId) continue;
+      if (u.name.toLowerCase().includes(needle) || u.email.toLowerCase().startsWith(needle)) {
+        ids.add(u.id);
+      }
+    }
+    return [...ids];
+  }
+
+  notifyProjectManagers(
+    projectId: string,
+    notification: Omit<Notification, "id" | "createdAt" | "read" | "userId">,
+  ): void {
+    const project = this.getProject(projectId);
+    if (!project) return;
+    const orgUsers = this.getUsersByOrganization(project.organizationId).filter((u) =>
+      ["admin", "pmo", "project_manager"].includes(u.role),
+    );
+    const targets = orgUsers.length > 0 ? orgUsers : this.getUsersByOrganization(project.organizationId).slice(0, 2);
+    for (const user of targets) {
+      void this.addNotification({
+        ...notification,
+        id: uuid(),
+        userId: user.id,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   getUserRecord(id: string): StoredUserRecord | undefined {
     return this.mem.users.get(id);
   }
@@ -763,18 +1115,23 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
     const mentions = input.body.match(/@([\w\u0590-\u05FF.-]+)/g);
     if (mentions) {
+      const notified = new Set<string>();
       for (const raw of mentions) {
         const name = raw.slice(1);
-        void this.addNotification({
-          id: uuid(),
-          userId: "pm-1",
-          type: "mention",
-          title: "Mentioned in comment",
-          body: `${input.userName} mentioned @${name} on task`,
-          read: false,
-          createdAt: new Date().toISOString(),
-          metadata: { taskId: input.taskId, commentId: comment.id },
-        });
+        for (const userId of this.resolveMentionUserIds(input.projectId, name)) {
+          if (notified.has(userId)) continue;
+          notified.add(userId);
+          void this.addNotification({
+            id: uuid(),
+            userId,
+            type: "mention",
+            title: "Mentioned in comment",
+            body: `${input.userName} mentioned you on a task`,
+            read: false,
+            createdAt: new Date().toISOString(),
+            metadata: { taskId: input.taskId, commentId: comment.id },
+          });
+        }
       }
     }
     this.logActivity({
@@ -1699,7 +2056,35 @@ export class DataStoreService implements OnApplicationBootstrap {
       createdAt: new Date().toISOString(),
     };
     this.mem.auditLogs.unshift(row);
-    if (this.mem.auditLogs.length > 2000) this.mem.auditLogs.length = 2000;
+    const orgLogs = this.mem.auditLogs.filter((a) => a.organizationId === entry.organizationId);
+    if (orgLogs.length > 500) {
+      const drop = orgLogs.length - 500;
+      let removed = 0;
+      for (let i = this.mem.auditLogs.length - 1; i >= 0 && removed < drop; i--) {
+        if (this.mem.auditLogs[i]!.organizationId === entry.organizationId) {
+          this.mem.auditLogs.splice(i, 1);
+          removed++;
+        }
+      }
+    }
+    if (this.useDb) {
+      void this.prisma.auditLog
+        .create({
+          data: {
+            id: row.id,
+            organizationId: row.organizationId,
+            userId: row.userId,
+            userName: row.userName,
+            action: row.action,
+            entityType: row.entityType,
+            entityId: row.entityId,
+            summary: row.summary,
+            metadata: (row.metadata ?? undefined) as object | undefined,
+            createdAt: new Date(row.createdAt),
+          },
+        })
+        .catch(() => undefined);
+    }
     return row;
   }
 
@@ -1743,6 +2128,21 @@ export class DataStoreService implements OnApplicationBootstrap {
   createProgram(input: Omit<import("@nexus/shared").Program, "id">): import("@nexus/shared").Program {
     const row: import("@nexus/shared").Program = { ...input, id: uuid() };
     this.mem.programs.push(row);
+    if (this.useDb) {
+      void this.prisma.program
+        .create({
+          data: {
+            id: row.id,
+            organizationId: row.organizationId,
+            name: row.name,
+            description: row.description,
+            projectIds: row.projectIds,
+            startDate: row.startDate,
+            endDate: row.endDate,
+          },
+        })
+        .catch(() => undefined);
+    }
     return row;
   }
 
@@ -1763,6 +2163,24 @@ export class DataStoreService implements OnApplicationBootstrap {
       createdAt: new Date().toISOString(),
     };
     this.mem.invoices.push(row);
+    if (this.useDb) {
+      void this.prisma.invoice
+        .create({
+          data: {
+            id: row.id,
+            organizationId: row.organizationId,
+            projectId: row.projectId,
+            clientName: row.clientName,
+            clientEmail: row.clientEmail,
+            status: row.status,
+            currency: row.currency,
+            lines: JSON.parse(JSON.stringify(row.lines)),
+            total: row.total,
+            dueDate: row.dueDate,
+          },
+        })
+        .catch(() => undefined);
+    }
     return row;
   }
 
@@ -1834,8 +2252,14 @@ export class DataStoreService implements OnApplicationBootstrap {
   setUserTotp(userId: string, secret: string, enabled: boolean): void {
     const u = this.mem.users.get(userId);
     if (!u) return;
-    u.totpSecret = secret;
+    u.totpSecret = secret || undefined;
     u.totpEnabled = enabled;
+    if (this.useDb) {
+      void this.prisma.user.update({
+        where: { id: userId },
+        data: { totpSecret: secret || null, totpEnabled: enabled },
+      });
+    }
   }
 
   getUserTotp(userId: string): { secret?: string; enabled: boolean } {

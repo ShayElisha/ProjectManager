@@ -74,8 +74,12 @@ export class ReportsService {
     const assignments = this.db.getAssignments(projectId);
     const tasks = this.db.getTasks(projectId);
 
+    const rangeStart = project.startDate;
+    const rangeEnd =
+      project.endDate ??
+      tasks.reduce((max, t) => (t.endDate > max ? t.endDate : max), project.startDate);
     const dates: string[] = [];
-    for (let d = new Date("2026-05-01"); d <= new Date("2026-07-31"); d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(rangeStart); d <= new Date(rangeEnd); d.setDate(d.getDate() + 1)) {
       dates.push(d.toISOString().slice(0, 10));
     }
     const slots = detectOverAllocations(assignments, tasks, resources, dates);

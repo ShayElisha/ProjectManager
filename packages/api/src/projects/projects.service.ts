@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { getProjectFinancials } from "@nexus/shared";
 import type { Project, EVMMetrics, Task, TaskDependency } from "@nexus/shared";
 import { v4 as uuid } from "uuid";
@@ -34,6 +34,14 @@ export class ProjectsService {
   }
 
   create(dto: Partial<Project>) {
+    if (dto.organizationId) {
+      const count = this.db.getProjects().filter((p) => p.organizationId === dto.organizationId).length;
+      const plans = this.db.getSubscriptionPlans();
+      const plan = plans.find((p) => p.id === "pro") ?? plans[plans.length - 1];
+      if (plan && count >= plan.maxProjects) {
+        throw new BadRequestException(`PLAN_LIMIT: max ${plan.maxProjects} projects on ${plan.name}`);
+      }
+    }
     return this.db.createProject(dto);
   }
 

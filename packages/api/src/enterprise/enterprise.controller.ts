@@ -8,6 +8,7 @@ export class EnterpriseController {
   constructor(private readonly enterprise: EnterpriseService) {}
 
   @Get("organizations/:orgId/audit")
+  @Roles("pmo")
   audit(@Req() req: { user: UserAccount }, @Param("orgId") orgId: string) {
     return this.enterprise.auditLogs(req.user, orgId);
   }

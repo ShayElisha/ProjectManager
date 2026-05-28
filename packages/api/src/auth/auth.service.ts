@@ -94,6 +94,11 @@ export class AuthService {
   }
 
   async samlAcs(email: string): Promise<AuthTokens> {
+    const allowDevAcs =
+      process.env.NODE_ENV !== "production" && process.env.SAML_DEV_ACS === "1";
+    if (!allowDevAcs) {
+      throw new UnauthorizedException("SAML_NOT_CONFIGURED");
+    }
     const normalized = email.trim().toLowerCase();
     const user = this.db.getUserByEmail(normalized);
     if (!user) throw new UnauthorizedException("SSO_USER_NOT_FOUND");

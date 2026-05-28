@@ -4,6 +4,7 @@ import type { UserAccount } from "@nexus/shared";
 import { roleAtLeast } from "@nexus/shared";
 import { OrganizationsService } from "./organizations.service";
 import { assertOrgAccess } from "../common/org-access";
+import { Roles } from "../auth/roles.decorator";
 
 class CreateOrgDto {
   @IsString()
@@ -37,7 +38,8 @@ export class OrganizationsController {
   }
 
   @Post()
-  create(@Req() req: { user: UserAccount }, @Body() body: CreateOrgDto) {
+  @Roles("admin")
+  create(@Body() body: CreateOrgDto) {
     return this.orgs.create(body);
   }
 

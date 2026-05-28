@@ -1,10 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+} from "@nestjs/common";
 import type { Response } from "express";
 import type { UserAccount } from "@nexus/shared";
 import { ProjectsService } from "./projects.service";
 import type { Project } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
-import { assertProjectAccess, resolveOrgFilter } from "../common/org-access";
+import { assertOrgAccess, assertProjectAccess, resolveOrgFilter } from "../common/org-access";
 
 @Controller("projects")
 export class ProjectsController {
@@ -37,6 +49,8 @@ export class ProjectsController {
   @Post()
   create(@Req() req: { user: UserAccount }, @Body() body: Partial<Project>) {
     const organizationId = body.organizationId ?? req.user.organizationId;
+    if (!organizationId) throw new ForbiddenException("ORG_REQUIRED");
+    assertOrgAccess(req.user, organizationId);
     return this.projects.create({ ...body, organizationId });
   }
 

@@ -394,11 +394,28 @@ export function ProjectHubPanel({ onClose }: Props) {
                     </p>
                     <ul className="mt-2 space-y-1 ps-2">
                       {krs.map((kr) => (
-                        <li key={kr.id} className="flex items-center justify-between gap-2">
-                          <span>{kr.title}</span>
-                          <span className="tabular-nums text-xs">
-                            {kr.currentValue}/{kr.targetValue}
-                          </span>
+                        <li key={kr.id} className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>{kr.title}</span>
+                            <span className="tabular-nums text-xs">
+                              {kr.currentValue}/{kr.targetValue}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={kr.targetValue}
+                            step={kr.targetValue > 100 ? 1 : 0.1}
+                            value={kr.currentValue}
+                            className="w-full"
+                            onChange={(e) => {
+                              void api
+                                .updateKeyResult(activeProjectId, kr.id, {
+                                  currentValue: Number(e.target.value),
+                                })
+                                .then(() => void load());
+                            }}
+                          />
                         </li>
                       ))}
                     </ul>

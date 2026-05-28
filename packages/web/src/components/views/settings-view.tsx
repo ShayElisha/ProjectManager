@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore, type AppSection } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { OrgWorkspacePanel } from "@/components/features/org-workspace-panel";
+import { api } from "@/lib/api";
 
 const MORE_SECTIONS: { id: AppSection; labelKey: string }[] = [
   { id: "enterprise", labelKey: "nav.enterprise" },
@@ -75,28 +76,27 @@ export function SettingsView() {
           <h3 className="text-sm font-medium text-[var(--muted)]">{t("settings.biExport")}</h3>
           <p className="text-xs text-[var(--muted)]">{t("settings.biHint")}</p>
           <div className="flex flex-wrap gap-2">
-            <a
-              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
-              href={`/api/export/projects/${activeProjectId}/bi`}
-              target="_blank"
-              rel="noreferrer"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void api.downloadBiJson(activeProjectId)}
             >
               {t("settings.biJson")}
-            </a>
-            <a
-              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
-              href={`/api/export/projects/${activeProjectId}/bi.csv`}
-              download
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void api.downloadBiCsv(activeProjectId)}
             >
               {t("settings.biCsv")}
-            </a>
-            <a
-              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
-              href={`/api/export/projects/${activeProjectId}/tasks`}
-              download
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void api.downloadTasksCsv(activeProjectId)}
             >
               {t("settings.tasksCsv")}
-            </a>
+            </Button>
           </div>
         </section>
       )}

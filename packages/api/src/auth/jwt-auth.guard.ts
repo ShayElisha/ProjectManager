@@ -15,12 +15,16 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       context.getClass(),
     ]);
     if (isPublic) return true;
-    if (process.env.AUTH_DISABLED === "1") return true;
+    const authDisabled =
+      process.env.AUTH_DISABLED === "1" && process.env.NODE_ENV !== "production";
+    if (authDisabled) return true;
     return super.canActivate(context);
   }
 
   handleRequest<T>(err: Error | null, user: T): T {
-    if (process.env.AUTH_DISABLED === "1") return user as T;
+    const authDisabled =
+      process.env.AUTH_DISABLED === "1" && process.env.NODE_ENV !== "production";
+    if (authDisabled) return user as T;
     if (err || !user) throw err ?? new Error("Unauthorized");
     return user;
   }

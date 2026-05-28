@@ -184,10 +184,25 @@ export class ProjectFeaturesService {
     if (!guest) throw new NotFoundException("Invalid guest link");
     const project = this.db.getProject(guest.projectId);
     if (!project) throw new NotFoundException("Project not found");
+    const tasks = this.db.getTasks(guest.projectId).map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      startDate: t.startDate,
+      endDate: t.endDate,
+      percentComplete: t.percentComplete,
+      wbs: t.wbs,
+    }));
     return {
-      guest,
-      project,
-      tasks: this.db.getTasks(guest.projectId),
+      guest: { id: guest.id, email: guest.email, name: guest.name, role: guest.role },
+      project: {
+        id: project.id,
+        name: project.name,
+        status: project.status,
+        startDate: project.startDate,
+        endDate: project.endDate,
+      },
+      tasks,
     };
   }
 

@@ -52,6 +52,18 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
   };
 }
 
+async function downloadBlob(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     ...init,
@@ -900,6 +912,12 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  downloadBiJson: (projectId: string) => downloadBlob(`/export/projects/${projectId}/bi`, `bi-${projectId}.json`),
+  downloadBiCsv: (projectId: string) =>
+    downloadBlob(`/export/projects/${projectId}/bi.csv`, `bi-${projectId}.csv`),
+  downloadTasksCsv: (projectId: string) =>
+    downloadBlob(`/export/projects/${projectId}/tasks`, `tasks-${projectId}.csv`),
 };
 
 export interface AIInsight {

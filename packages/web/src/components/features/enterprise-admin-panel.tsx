@@ -13,10 +13,20 @@ import type {
   Invoice,
   OrgAutomationRule,
   Program,
+  ProofAsset,
   SubscriptionPlan,
+  TaskPermissionLevel,
 } from "@nexus/shared";
 
-type Tab = "audit" | "programs" | "invoices" | "crm" | "automation" | "billing" | "security";
+type Tab =
+  | "audit"
+  | "programs"
+  | "invoices"
+  | "crm"
+  | "automation"
+  | "billing"
+  | "proofing"
+  | "security";
 
 export function EnterpriseAdminPanel() {
   const { t } = useTranslation();
@@ -39,6 +49,12 @@ export function EnterpriseAdminPanel() {
   const [contactName, setContactName] = useState("");
   const [dealTitle, setDealTitle] = useState("");
   const [ruleName, setRuleName] = useState("");
+  const [ruleEvent, setRuleEvent] = useState("task.updated");
+  const [proofs, setProofs] = useState<ProofAsset[]>([]);
+  const [proofTitle, setProofTitle] = useState("");
+  const [permUserId, setPermUserId] = useState("");
+  const [permTaskId, setPermTaskId] = useState("");
+  const [permLevel, setPermLevel] = useState<TaskPermissionLevel>("read");
 
   const reload = useCallback(async () => {
     if (!orgId) return;
@@ -64,9 +80,22 @@ export function EnterpriseAdminPanel() {
     }
   }, [orgId, t]);
 
+  const reloadProofs = useCallback(async () => {
+    if (!activeProjectId) return;
+    try {
+      setProofs(await api.proofAssets(activeProjectId));
+    } catch {
+      /* optional */
+    }
+  }, [activeProjectId]);
+
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (tab === "proofing") void reloadProofs();
+  }, [tab, reloadProofs]);
 
   if (!orgId) {
     return (
@@ -81,6 +110,7 @@ export function EnterpriseAdminPanel() {
     { id: "crm", label: t("enterprise.tabs.crm") },
     { id: "automation", label: t("enterprise.tabs.automation") },
     { id: "billing", label: t("enterprise.tabs.billing") },
+    { id: "proofing", label: t("enterprise.tabs.proofing") },
     { id: "security", label: t("enterprise.tabs.security") },
   ];
 
@@ -268,13 +298,22 @@ export function EnterpriseAdminPanel() {
 
       {tab === "automation" && (
         <div className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
-              className="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              className="flex-1 min-w-[140px] rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               value={ruleName}
               onChange={(e) => setRuleName(e.target.value)}
               placeholder={t("enterprise.ruleName")}
             />
+            <select
+              className="rounded-lg border border-[var(--border)] bg-transparent px-2 py-2 text-sm"
+              value={ruleEvent}
+              onChange={(e) => setRuleEvent(e.target.value)}
+            >
+              <option value="task.updated">task.updated</option>
+              <option value="task.created">task.created</option>
+              <option value="project.updated">project.updated</option>
+            </select>
             <Button
               size="sm"
               onClick={() => {
@@ -283,7 +322,7 @@ export function EnterpriseAdminPanel() {
                 void api
                   .createOrgAutomationRule(orgId, {
                     name,
-                    event: "task.updated",
+                    event: ruleEvent,
                     actionType: "notify",
                   })
                   .then(() => {
@@ -332,6 +371,76 @@ export function EnterpriseAdminPanel() {
               </Button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "proofing" && (
+        <div className="space-y-3">
+          {!activeProjectId ? (
+            <p className="text-sm text-[var(--muted)]">{t("enterprise.selectProject")}</p>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                  value={proofTitle}
+                  onChange={(e) => setProofTitle(e.target.value)}
+                  placeholder={t("enterprise.proofTitle")}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const title = proofTitle.trim();
+                    if (!title) return;
+                    void api.createProof(activeProjectId, { title }).then(() => {
+                      setProofTitle("");
+                      void reloadProofs();
+                    });
+                  }}
+                >
+                  {t("enterprise.add")}
+                </Button>
+              </div>
+              <ul className="space-y-2 text-sm">
+                {proofs.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--border)] px-3 py-2"
+                  >
+                    <span>
+                      {p.title} · {p.status}
+                    </span>
+                    {p.status === "pending" && (
+                      <span className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            void api
+                              .reviewProof(activeProjectId, p.id, { status: "approved" })
+                              .then(() => void reloadProofs());
+                          }}
+                        >
+                          {t("enterprise.approve")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            void api
+                              .reviewProof(activeProjectId, p.id, { status: "rejected" })
+                              .then(() => void reloadProofs());
+                          }}
+                        >
+                          {t("enterprise.reject")}
+                        </Button>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
 
@@ -407,6 +516,44 @@ export function EnterpriseAdminPanel() {
             <div>
               <h3 className="text-sm font-medium">{t("enterprise.taskPerms")}</h3>
               <p className="text-xs text-[var(--muted)]">{t("enterprise.taskPermsHint")}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <input
+                  className="w-36 rounded border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
+                  placeholder={t("enterprise.permUserId")}
+                  value={permUserId}
+                  onChange={(e) => setPermUserId(e.target.value)}
+                />
+                <input
+                  className="w-36 rounded border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
+                  placeholder={t("enterprise.permTaskId")}
+                  value={permTaskId}
+                  onChange={(e) => setPermTaskId(e.target.value)}
+                />
+                <select
+                  className="rounded border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
+                  value={permLevel}
+                  onChange={(e) => setPermLevel(e.target.value as TaskPermissionLevel)}
+                >
+                  <option value="read">read</option>
+                  <option value="write">write</option>
+                  <option value="admin">admin</option>
+                </select>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!permUserId.trim() || !permTaskId.trim()) return;
+                    void api
+                      .setTaskPermission(activeProjectId, {
+                        userId: permUserId.trim(),
+                        taskId: permTaskId.trim(),
+                        level: permLevel,
+                      })
+                      .then(() => toast.success(t("enterprise.saved")));
+                  }}
+                >
+                  {t("enterprise.grantPerm")}
+                </Button>
+              </div>
             </div>
           )}
         </div>

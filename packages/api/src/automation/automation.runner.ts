@@ -49,14 +49,10 @@ function applyAction(
     void db.updateTask(projectId, task.id, { [field]: value } as Partial<Task>);
   }
   if (rule.actionType === "notify") {
-    void db.addNotification({
-      id: uuid(),
-      userId: "pm-1",
+    db.notifyProjectManagers(projectId, {
       type: "automation",
       title: rule.name,
       body: `Task «${task.name}» matched rule`,
-      read: false,
-      createdAt: new Date().toISOString(),
       metadata: { taskId: task.id, ruleId: rule.id },
     });
   }

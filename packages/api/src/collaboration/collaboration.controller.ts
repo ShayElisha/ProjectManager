@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
 import { v4 as uuid } from "uuid";
 import type { TimesheetEntry, UserAccount } from "@nexus/shared";
@@ -6,9 +17,6 @@ import { BudgetService } from "../budget/budget.service";
 import { DataStoreService } from "../database/data-store.service";
 
 class SubmitTimesheetDto {
-  @IsString()
-  userId!: string;
-
   @IsString()
   taskId!: string;
 
@@ -48,25 +56,27 @@ export class CollaborationController {
 
   @Post("timesheets")
   async submitTimesheet(
+    @Req() req: { user: UserAccount },
     @Param("projectId") projectId: string,
     @Body() body: SubmitTimesheetDto,
   ) {
     const entry: TimesheetEntry = {
       id: uuid(),
       projectId,
-      ...body,
+      userId: req.user.id,
+      taskId: body.taskId,
+      date: body.date,
+      hours: body.hours,
+      notes: body.notes,
       status: "submitted",
     };
     await this.db.addTimesheet(entry);
     const overview = await this.budget.recalculate(projectId, false);
-    await this.db.addNotification({
-      id: uuid(),
-      userId: "pm-1",
+    this.db.notifyProjectManagers(projectId, {
       type: "approval",
       title: "Timesheet pending approval",
-      body: `${body.hours}h on ${body.date}`,
-      read: false,
-      createdAt: new Date().toISOString(),
+      body: `${req.user.name}: ${body.hours}h on ${body.date}`,
+      metadata: { entryId: entry.id, taskId: body.taskId },
     });
     return { entry, budget: overview };
   }
@@ -89,53 +99,45 @@ export class CollaborationController {
   }
 
   @Get("notifications")
-  notifications(@Query("userId") userId?: string, @Req() req?: { user?: UserAccount }) {
-    const uid = userId ?? req?.user?.id;
-    return this.db.getNotifications(uid);
+  notifications(@Req() req: { user: UserAccount }) {
+    return this.db.getNotifications(req.user.id);
   }
 
   @Patch("notifications/:id/read")
-  markNotificationRead(@Param("id") id: string) {
+  markNotificationRead(@Req() req: { user: UserAccount }, @Param("id") id: string) {
+    const list = this.db.getNotifications(req.user.id);
+    const n = list.find((x) => x.id === id);
+    if (!n) throw new NotFoundException();
+    if (n.userId !== req.user.id) throw new ForbiddenException();
     return this.db.markNotificationRead(id);
   }
 
   @Post("notifications/read-all")
-  markAllNotificationsRead(
-    @Body() body: { userId?: string },
-    @Req() req: { user?: UserAccount },
-  ) {
-    const uid = body.userId ?? req.user?.id;
-    return this.db.markAllNotificationsRead(uid);
+  markAllNotificationsRead(@Req() req: { user: UserAccount }) {
+    return this.db.markAllNotificationsRead(req.user.id);
   }
 
   @Get("timer")
-  activeTimer(
-    @Param("projectId") projectId: string,
-    @Req() req: { user?: UserAccount },
-    @Query("userId") userId?: string,
-  ) {
-    const uid = userId ?? req.user?.id ?? "anonymous";
-    return this.db.getActiveTimer(uid, projectId);
+  activeTimer(@Req() req: { user: UserAccount }, @Param("projectId") projectId: string) {
+    return this.db.getActiveTimer(req.user.id, projectId);
   }
 
   @Post("timer/start")
   startTimer(
+    @Req() req: { user: UserAccount },
     @Param("projectId") projectId: string,
-    @Body() body: { taskId?: string; userId?: string },
-    @Req() req: { user?: UserAccount },
+    @Body() body: { taskId?: string },
   ) {
-    const uid = body.userId ?? req.user?.id ?? "anonymous";
-    return this.db.startTimer(uid, projectId, body.taskId);
+    return this.db.startTimer(req.user.id, projectId, body.taskId);
   }
 
   @Post("timer/stop")
   async stopTimer(
+    @Req() req: { user: UserAccount },
     @Param("projectId") projectId: string,
-    @Body() body: { userId?: string; notes?: string },
-    @Req() req: { user?: UserAccount },
+    @Body() body: { notes?: string },
   ) {
-    const uid = body.userId ?? req.user?.id ?? "anonymous";
-    const result = await this.db.stopTimer(uid, projectId, body.notes);
+    const result = await this.db.stopTimer(req.user.id, projectId, body.notes);
     if (result?.entry) {
       const overview = await this.budget.recalculate(projectId, false);
       return { ...result, budget: overview };

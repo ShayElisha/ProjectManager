@@ -9,13 +9,122 @@ datasource db {
 }
 
 model Organization {
-  id              String     @id @default(uuid()) @map("_id")
-  name            String
-  defaultLocale   String     @default("he")
-  defaultCurrency String     @default("ILS")
-  projects        Project[]
-  resources       Resource[]
-  users           User[]
+  id                 String     @id @default(uuid()) @map("_id")
+  name               String
+  defaultLocale      String     @default("he")
+  defaultCurrency    String     @default("ILS")
+  planId             String?
+  stripeCustomerId   String?
+  subscriptionStatus String?
+  projects           Project[]
+  resources          Resource[]
+  users              User[]
+  auditLogs          AuditLog[]
+  programs           Program[]
+  invoices           Invoice[]
+  crmContacts        CrmContact[]
+  crmDeals           CrmDeal[]
+  orgAutomationRules OrgAutomationRule[]
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String?
+  userName       String?
+  action         String
+  entityType     String
+  entityId       String?
+  summary        String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+}
+
+model Program {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  projectIds     Json         @default("[]")
+  startDate      String?
+  endDate        String?
+}
+
+model Invoice {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  projectId      String?
+  clientName     String
+  clientEmail    String?
+  status         String       @default("draft")
+  currency       String       @default("ILS")
+  lines          Json
+  total          Float
+  dueDate        String?
+  createdAt      DateTime     @default(now())
+}
+
+model CrmContact {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String?
+  company        String?
+  phone          String?
+}
+
+model CrmDeal {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  contactId      String?
+  title          String
+  value          Float
+  stage          String       @default("lead")
+  projectId      String?
+}
+
+model OrgAutomationRule {
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  enabled        Boolean      @default(true)
+  event          String
+  actionType     String
+  actionPayload  Json?
+}
+
+model ProofAsset {
+  id           String   @id @default(uuid()) @map("_id")
+  projectId    String
+  taskId       String?
+  title        String
+  fileUrl      String?
+  status       String   @default("pending")
+  reviewerNote String?
+  createdAt    DateTime @default(now())
+}
+
+model TaskPermission {
+  id        String @id @default(uuid()) @map("_id")
+  projectId String
+  taskId    String
+  userId    String
+  level     String
+}
+
+model ResourcePto {
+  id         String @id @default(uuid()) @map("_id")
+  projectId  String
+  resourceId String
+  startDate  String
+  endDate    String
+  label      String?
 }
 
 model User {
@@ -26,6 +135,8 @@ model User {
   role           String        @default("team_member")
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
+  totpSecret     String?
+  totpEnabled    Boolean       @default(false)
   createdAt      DateTime      @default(now())
 }
 
