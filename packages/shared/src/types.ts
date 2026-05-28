@@ -174,6 +174,8 @@ export interface UserAccount {
 export interface AuthTokens {
   accessToken: string;
   user: UserAccount;
+  /** Login paused until TOTP code is supplied */
+  requiresTotp?: boolean;
 }
 
 /** Project role code — free text, up to 3 letters (e.g. PMO, DEV). */

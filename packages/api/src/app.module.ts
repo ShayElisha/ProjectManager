@@ -20,18 +20,22 @@ import { DatabaseModule } from "./database/database.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { IntegrationsModule } from "./integrations/integrations.module";
 import { ExportModule } from "./export/export.module";
+import { AuditModule } from "./audit/audit.module";
+import { EnterpriseModule } from "./enterprise/enterprise.module";
 
 const realtimeModules = process.env.VERCEL ? [] : [RealtimeModule];
 
 @Module({
   imports: [
     DatabaseModule,
+    AuditModule,
     AuthModule,
     OrganizationsModule,
     SearchModule,
     ProjectFeaturesModule,
     IntegrationsModule,
     ExportModule,
+    EnterpriseModule,
     ...realtimeModules,
     ProjectsModule,
     TasksModule,

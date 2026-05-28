@@ -34,11 +34,22 @@ import type {
   KeyResult,
   WhiteboardItem,
   ResourcePto,
+  AuditLogEntry,
+  TaskPermission,
+  Program,
+  Invoice,
+  ProofAsset,
+  CrmContact,
+  CrmDeal,
+  OrgAutomationRule,
+  SubscriptionPlan,
 } from "@nexus/shared";
 import { buildSeedData } from "./seed-data";
 
 export interface StoredUserRecord extends UserAccount {
   passwordHash: string;
+  totpSecret?: string;
+  totpEnabled?: boolean;
 }
 
 export class InMemoryBackend {
@@ -67,6 +78,19 @@ export class InMemoryBackend {
   keyResults = new Map<string, KeyResult[]>();
   whiteboardItems = new Map<string, WhiteboardItem[]>();
   resourcePtos: ResourcePto[] = [];
+  auditLogs: AuditLogEntry[] = [];
+  taskPermissions: TaskPermission[] = [];
+  programs: Program[] = [];
+  invoices: Invoice[] = [];
+  proofAssets: ProofAsset[] = [];
+  crmContacts: CrmContact[] = [];
+  crmDeals: CrmDeal[] = [];
+  orgAutomationRules: OrgAutomationRule[] = [];
+  subscriptionPlans: SubscriptionPlan[] = [
+    { id: "starter", name: "Starter", priceMonthly: 49, currency: "USD", maxProjects: 5, maxUsers: 10 },
+    { id: "pro", name: "Pro", priceMonthly: 149, currency: "USD", maxProjects: 25, maxUsers: 50 },
+    { id: "enterprise", name: "Enterprise", priceMonthly: 499, currency: "USD", maxProjects: 999, maxUsers: 999 },
+  ];
   projects = new Map<string, Project>();
   tasks = new Map<string, Task[]>();
   dependencies = new Map<string, TaskDependency[]>();

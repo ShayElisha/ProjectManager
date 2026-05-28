@@ -9,7 +9,7 @@ interface AuthState {
   user: AuthUser | null;
   ready: boolean;
   hydrate: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, totpCode?: string) => Promise<{ requiresTotp?: boolean }>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -58,22 +58,29 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: cached, ready: true });
   },
 
-  login: async (email, password) => {
+  login: async (email, password, totpCode) => {
     try {
-      const { accessToken, user: u } = await api.login(email, password);
-      setAccessToken(accessToken);
+      const res = await api.login(email, password, totpCode);
+      if (res.requiresTotp) {
+        return { requiresTotp: true };
+      }
+      setAccessToken(res.accessToken);
       const user: AuthUser = {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        organizationId: u.organizationId,
+        id: res.user.id,
+        name: res.user.name,
+        email: res.user.email,
+        organizationId: res.user.organizationId,
       };
       persistSession(user);
       set({ user });
+      return {};
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("INVALID_CREDENTIALS") || msg.includes("401")) {
         throw new Error("INVALID_CREDENTIALS");
+      }
+      if (msg.includes("INVALID_TOTP")) {
+        throw new Error("INVALID_TOTP");
       }
       throw err;
     }

@@ -27,6 +27,20 @@ class LoginDto {
 
   @IsString()
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  totpCode?: string;
+}
+
+class TotpCodeDto {
+  @IsString()
+  code!: string;
+}
+
+class SamlAcsDto {
+  @IsEmail()
+  email!: string;
 }
 
 @Controller("auth")
@@ -42,12 +56,39 @@ export class AuthController {
   @Public()
   @Post("login")
   login(@Body() body: LoginDto) {
-    return this.auth.login(body.email, body.password);
+    return this.auth.login(body.email, body.password, body.totpCode);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get("me")
   me(@Req() req: { user: UserAccount }) {
     return req.user;
+  }
+
+  @Public()
+  @Get("sso/saml/metadata")
+  samlMetadata() {
+    return this.auth.samlMetadata();
+  }
+
+  @Public()
+  @Post("sso/saml/acs")
+  samlAcs(@Body() body: SamlAcsDto) {
+    return this.auth.samlAcs(body.email);
+  }
+
+  @Post("2fa/setup")
+  setup2fa(@Req() req: { user: UserAccount }) {
+    return this.auth.setup2fa(req.user.id);
+  }
+
+  @Post("2fa/enable")
+  enable2fa(@Req() req: { user: UserAccount }, @Body() body: TotpCodeDto) {
+    return this.auth.enable2fa(req.user.id, body.code);
+  }
+
+  @Post("2fa/disable")
+  disable2fa(@Req() req: { user: UserAccount }, @Body() body: TotpCodeDto) {
+    return this.auth.disable2fa(req.user.id, body.code);
   }
 }

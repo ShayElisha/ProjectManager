@@ -1692,6 +1692,157 @@ export class DataStoreService implements OnApplicationBootstrap {
     return pto.length > 0 ? 8 : 0;
   }
 
+  writeAudit(entry: Omit<import("@nexus/shared").AuditLogEntry, "id" | "createdAt">) {
+    const row: import("@nexus/shared").AuditLogEntry = {
+      ...entry,
+      id: uuid(),
+      createdAt: new Date().toISOString(),
+    };
+    this.mem.auditLogs.unshift(row);
+    if (this.mem.auditLogs.length > 2000) this.mem.auditLogs.length = 2000;
+    return row;
+  }
+
+  getAuditLogs(organizationId: string, limit = 200): import("@nexus/shared").AuditLogEntry[] {
+    return this.mem.auditLogs.filter((a) => a.organizationId === organizationId).slice(0, limit);
+  }
+
+  getTaskPermissions(projectId: string, taskId?: string): import("@nexus/shared").TaskPermission[] {
+    const all = this.mem.taskPermissions.filter((p) => p.projectId === projectId);
+    return taskId ? all.filter((p) => p.taskId === taskId) : all;
+  }
+
+  setTaskPermission(input: Omit<import("@nexus/shared").TaskPermission, "id">): import("@nexus/shared").TaskPermission {
+    const existing = this.mem.taskPermissions.findIndex(
+      (p) => p.taskId === input.taskId && p.userId === input.userId,
+    );
+    const row: import("@nexus/shared").TaskPermission = { ...input, id: uuid() };
+    if (existing >= 0) this.mem.taskPermissions[existing] = row;
+    else this.mem.taskPermissions.push(row);
+    return row;
+  }
+
+  canAccessTask(
+    userId: string,
+    projectId: string,
+    taskId: string,
+    level: import("@nexus/shared").TaskPermissionLevel,
+  ): boolean {
+    const perms = this.getTaskPermissions(projectId, taskId);
+    if (perms.length === 0) return true;
+    const userPerm = perms.find((p) => p.userId === userId);
+    if (!userPerm) return false;
+    const rank = { read: 1, write: 2, admin: 3 };
+    return rank[userPerm.level] >= rank[level];
+  }
+
+  getPrograms(organizationId: string): import("@nexus/shared").Program[] {
+    return this.mem.programs.filter((p) => p.organizationId === organizationId);
+  }
+
+  createProgram(input: Omit<import("@nexus/shared").Program, "id">): import("@nexus/shared").Program {
+    const row: import("@nexus/shared").Program = { ...input, id: uuid() };
+    this.mem.programs.push(row);
+    return row;
+  }
+
+  getInvoices(organizationId: string): import("@nexus/shared").Invoice[] {
+    return this.mem.invoices.filter((i) => i.organizationId === organizationId);
+  }
+
+  createInvoice(
+    input: Omit<import("@nexus/shared").Invoice, "id" | "createdAt" | "total"> & {
+      lines: import("@nexus/shared").InvoiceLine[];
+    },
+  ): import("@nexus/shared").Invoice {
+    const total = input.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+    const row: import("@nexus/shared").Invoice = {
+      ...input,
+      id: uuid(),
+      total,
+      createdAt: new Date().toISOString(),
+    };
+    this.mem.invoices.push(row);
+    return row;
+  }
+
+  getProofAssets(projectId: string): import("@nexus/shared").ProofAsset[] {
+    return this.mem.proofAssets.filter((p) => p.projectId === projectId);
+  }
+
+  createProofAsset(
+    input: Omit<import("@nexus/shared").ProofAsset, "id" | "createdAt" | "status">,
+  ): import("@nexus/shared").ProofAsset {
+    const row: import("@nexus/shared").ProofAsset = {
+      ...input,
+      id: uuid(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+    this.mem.proofAssets.push(row);
+    return row;
+  }
+
+  updateProofAsset(
+    id: string,
+    patch: Partial<import("@nexus/shared").ProofAsset>,
+  ): import("@nexus/shared").ProofAsset | null {
+    const idx = this.mem.proofAssets.findIndex((p) => p.id === id);
+    if (idx < 0) return null;
+    this.mem.proofAssets[idx] = { ...this.mem.proofAssets[idx]!, ...patch };
+    return this.mem.proofAssets[idx]!;
+  }
+
+  getCrmContacts(organizationId: string): import("@nexus/shared").CrmContact[] {
+    return this.mem.crmContacts.filter((c) => c.organizationId === organizationId);
+  }
+
+  createCrmContact(
+    input: Omit<import("@nexus/shared").CrmContact, "id">,
+  ): import("@nexus/shared").CrmContact {
+    const row: import("@nexus/shared").CrmContact = { ...input, id: uuid() };
+    this.mem.crmContacts.push(row);
+    return row;
+  }
+
+  getCrmDeals(organizationId: string): import("@nexus/shared").CrmDeal[] {
+    return this.mem.crmDeals.filter((d) => d.organizationId === organizationId);
+  }
+
+  createCrmDeal(input: Omit<import("@nexus/shared").CrmDeal, "id">): import("@nexus/shared").CrmDeal {
+    const row: import("@nexus/shared").CrmDeal = { ...input, id: uuid() };
+    this.mem.crmDeals.push(row);
+    return row;
+  }
+
+  getOrgAutomationRules(organizationId: string): import("@nexus/shared").OrgAutomationRule[] {
+    return this.mem.orgAutomationRules.filter((r) => r.organizationId === organizationId);
+  }
+
+  createOrgAutomationRule(
+    input: Omit<import("@nexus/shared").OrgAutomationRule, "id">,
+  ): import("@nexus/shared").OrgAutomationRule {
+    const row: import("@nexus/shared").OrgAutomationRule = { ...input, id: uuid() };
+    this.mem.orgAutomationRules.push(row);
+    return row;
+  }
+
+  getSubscriptionPlans(): import("@nexus/shared").SubscriptionPlan[] {
+    return this.mem.subscriptionPlans;
+  }
+
+  setUserTotp(userId: string, secret: string, enabled: boolean): void {
+    const u = this.mem.users.get(userId);
+    if (!u) return;
+    u.totpSecret = secret;
+    u.totpEnabled = enabled;
+  }
+
+  getUserTotp(userId: string): { secret?: string; enabled: boolean } {
+    const u = this.mem.users.get(userId);
+    return { secret: u?.totpSecret, enabled: !!u?.totpEnabled };
+  }
+
   async setTasks(projectId: string, tasks: Task[]) {
     this.mem.tasks.set(projectId, tasks);
     const prev = this.taskPersistChains.get(projectId) ?? Promise.resolve();

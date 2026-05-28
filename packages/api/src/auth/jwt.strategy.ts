@@ -7,6 +7,8 @@ import { DataStoreService } from "../database/data-store.service";
 export interface JwtPayload {
   sub: string;
   email: string;
+  organizationId?: string;
+  role?: string;
 }
 
 @Injectable()

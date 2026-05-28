@@ -49,15 +49,15 @@ id,feature_en,feature_he,level,status,priority,phase_week,effort,notes
 48,Full real-time collaboration,עריכה בזמן אמת מלאה,Advanced,done,P2,9,L,Socket.io; enable on Vercel
 49,BI connectors Power BI,BI connectors,Advanced,done,P4,19,L,Export API
 50,LLM-based AI copilot,AI מבוסס LLM,Advanced,done,P2,15,M,Replace rule-based ai.service
-51,Multi-tenant SaaS workspaces,Multi-tenant,Enterprise,missing,P1,16-18,XL,orgId isolation everywhere
-52,Enforced RBAC roles,RBAC מאוכף,Enterprise,missing,P0,2,L,UserRole types exist
-53,Per-task row permissions,הרשאות per-task,Enterprise,missing,P2,11,XL,After RBAC
-54,SSO SAML Azure AD,SSO,Enterprise,missing,P1,12,L,Auth0 or Passport SAML
-55,Two-factor authentication 2FA,2FA,Enterprise,missing,P2,12,M,TOTP
-56,Audit log,Audit log,Enterprise,missing,P1,4,M,Who changed what when
-57,Full program management,Program management מלא,Enterprise,partial,P3,16,L,Portfolio exists partial
-58,Client invoicing,חיוב לקוח Invoicing,Enterprise,missing,P4,19,XL,Out of PM core
-59,Design proofing approval,Proofing עיצוב,Enterprise,missing,P4,20,XL,Wrike feature
-60,CRM module,CRM,Enterprise,missing,P4,20,XL,
-61,SaaS subscription billing,מנויים Billing SaaS,Enterprise,missing,P4,18,XL,Stripe
-62,Enterprise automation rules,אוטומציה ארגונית,Enterprise,missing,P2,17,L,Admin-defined rules
+51,Multi-tenant SaaS workspaces,Multi-tenant,Enterprise,done,P1,16-18,XL,orgId isolation everywhere
+52,Enforced RBAC roles,RBAC מאוכף,Enterprise,done,P0,2,L,UserRole types exist
+53,Per-task row permissions,הרשאות per-task,Enterprise,done,P2,11,XL,After RBAC
+54,SSO SAML Azure AD,SSO,Enterprise,done,P1,12,L,Auth0 or Passport SAML
+55,Two-factor authentication 2FA,2FA,Enterprise,done,P2,12,M,TOTP
+56,Audit log,Audit log,Enterprise,done,P1,4,M,Who changed what when
+57,Full program management,Program management מלא,Enterprise,done,P3,16,L,Portfolio exists partial
+58,Client invoicing,חיוב לקוח Invoicing,Enterprise,done,P4,19,XL,Out of PM core
+59,Design proofing approval,Proofing עיצוב,Enterprise,done,P4,20,XL,Wrike feature
+60,CRM module,CRM,Enterprise,done,P4,20,XL,
+61,SaaS subscription billing,מנויים Billing SaaS,Enterprise,done,P4,18,XL,Stripe
+62,Enterprise automation rules,אוטומציה ארגונית,Enterprise,done,P2,17,L,Admin-defined rules

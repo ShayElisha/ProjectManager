@@ -29,6 +29,7 @@ const SECTIONS: AppSection[] = [
   "timesheets",
   "reports",
   "settings",
+  "enterprise",
 ];
 
 function isViewMode(v: string): v is ViewMode {

@@ -46,7 +46,8 @@ export type AppSection =
   | "vendorQuotes"
   | "timesheets"
   | "reports"
-  | "settings";
+  | "settings"
+  | "enterprise";
 
 export interface CreateTaskInput {
   name: string;

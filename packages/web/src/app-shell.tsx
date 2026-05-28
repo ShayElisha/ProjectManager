@@ -53,6 +53,7 @@ import { TimesheetsView } from "@/components/views/timesheets-view";
 import { ReportsView } from "@/components/views/reports-view";
 import { BudgetView } from "@/components/views/budget-view";
 import { SettingsView } from "@/components/views/settings-view";
+import { EnterpriseAdminPanel } from "@/components/features/enterprise-admin-panel";
 import { TeamView } from "@/components/views/team-view";
 import { VendorQuotesView } from "@/components/views/vendor-quotes-view";
 import { ProjectConfigPanel } from "@/components/project-config-panel";
@@ -379,6 +380,11 @@ export default function AppShell() {
           {section === "reports" && <ReportsView />}
           {section === "timesheets" && <TimesheetsView />}
           {section === "settings" && <SettingsView />}
+          {section === "enterprise" && (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 md:p-6">
+              <EnterpriseAdminPanel />
+            </div>
+          )}
         </main>
         {section === "project" && projects.length > 0 && (
           <>

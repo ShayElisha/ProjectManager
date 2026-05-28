@@ -12,6 +12,8 @@ export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,10 +24,16 @@ export function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      const result = await login(email, password, needsTotp ? totpCode : undefined);
+      if (result.requiresTotp) {
+        setNeedsTotp(true);
+        return;
+      }
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof Error && err.message === "INVALID_CREDENTIALS") {
+        setError(t("auth.errorInvalid"));
+      } else if (err instanceof Error && err.message === "INVALID_TOTP") {
         setError(t("auth.errorInvalid"));
       } else {
         setError(t("auth.errorGeneric"));
@@ -54,6 +62,9 @@ export function LoginPage() {
             {error}
           </p>
         )}
+        {needsTotp && (
+          <p className="text-sm text-[var(--muted)]">{t("auth.totpRequired")}</p>
+        )}
         <label className="block text-sm">
           <span className="text-[var(--muted)]">{t("auth.email")}</span>
           <input
@@ -63,6 +74,7 @@ export function LoginPage() {
             className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={needsTotp}
           />
         </label>
         <label className="block text-sm">
@@ -75,8 +87,25 @@ export function LoginPage() {
             className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={needsTotp}
           />
         </label>
+        {needsTotp && (
+          <label className="block text-sm">
+            <span className="text-[var(--muted)]">{t("auth.totpCode")}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              autoComplete="one-time-code"
+              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </label>
+        )}
         <Button type="submit" className="w-full h-11" disabled={loading}>
           {loading ? t("auth.loading") : t("auth.login")}
         </Button>

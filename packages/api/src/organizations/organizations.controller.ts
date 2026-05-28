@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Req } from "@nestjs/common";
 import { IsIn, IsOptional, IsString } from "class-validator";
+import type { UserAccount } from "@nexus/shared";
+import { roleAtLeast } from "@nexus/shared";
 import { OrganizationsService } from "./organizations.service";
+import { assertOrgAccess } from "../common/org-access";
 
 class CreateOrgDto {
   @IsString()
@@ -20,22 +23,27 @@ export class OrganizationsController {
   constructor(private readonly orgs: OrganizationsService) {}
 
   @Get()
-  list() {
-    return this.orgs.list();
+  list(@Req() req: { user: UserAccount }) {
+    const all = this.orgs.list();
+    if (roleAtLeast(req.user.role, "admin") && !req.user.organizationId) return all;
+    if (!req.user.organizationId) return all;
+    return all.filter((o) => o.id === req.user.organizationId);
   }
 
   @Get(":id")
-  get(@Param("id") id: string) {
+  get(@Req() req: { user: UserAccount }, @Param("id") id: string) {
+    assertOrgAccess(req.user, id);
     return this.orgs.get(id);
   }
 
   @Post()
-  create(@Body() body: CreateOrgDto) {
+  create(@Req() req: { user: UserAccount }, @Body() body: CreateOrgDto) {
     return this.orgs.create(body);
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() body: CreateOrgDto) {
+  update(@Req() req: { user: UserAccount }, @Param("id") id: string, @Body() body: CreateOrgDto) {
+    assertOrgAccess(req.user, id);
     return this.orgs.update(id, body);
   }
 }

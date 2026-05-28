@@ -70,11 +70,27 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  login: (email: string, password: string) =>
+  login: (email: string, password: string, totpCode?: string) =>
     fetchJson<AuthTokens>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, totpCode }),
     }),
+  setup2fa: () =>
+    fetchJson<{ secret: string; uri: string }>("/auth/2fa/setup", { method: "POST" }),
+  enable2fa: (code: string) =>
+    fetchJson<{ enabled: boolean }>("/auth/2fa/enable", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+  disable2fa: (code: string) =>
+    fetchJson<{ enabled: boolean }>("/auth/2fa/disable", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+  samlMetadata: () =>
+    fetchJson<{ enabled: boolean; entryPoint: string | null; hint: string }>(
+      "/auth/sso/saml/metadata",
+    ),
   register: (name: string, email: string, password: string, organizationId?: string) =>
     fetchJson<AuthTokens>("/auth/register", {
       method: "POST",
@@ -793,6 +809,95 @@ export const api = {
   ) =>
     fetchJson<Task[]>(`/projects/${projectId}/tasks/recurring`, {
       method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  auditLogs: (orgId: string) =>
+    fetchJson<import("@nexus/shared").AuditLogEntry[]>(`/organizations/${orgId}/audit`),
+  programs: (orgId: string) =>
+    fetchJson<import("@nexus/shared").Program[]>(`/organizations/${orgId}/programs`),
+  createProgram: (orgId: string, body: { name: string; description?: string; projectIds?: string[] }) =>
+    fetchJson<import("@nexus/shared").Program>(`/organizations/${orgId}/programs`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  invoices: (orgId: string) =>
+    fetchJson<import("@nexus/shared").Invoice[]>(`/organizations/${orgId}/invoices`),
+  createInvoice: (
+    orgId: string,
+    body: {
+      clientName: string;
+      clientEmail?: string;
+      lines: import("@nexus/shared").InvoiceLine[];
+      currency?: string;
+    },
+  ) =>
+    fetchJson<import("@nexus/shared").Invoice>(`/organizations/${orgId}/invoices`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  crmContacts: (orgId: string) =>
+    fetchJson<import("@nexus/shared").CrmContact[]>(`/organizations/${orgId}/crm/contacts`),
+  createCrmContact: (orgId: string, body: { name: string; email?: string; company?: string }) =>
+    fetchJson<import("@nexus/shared").CrmContact>(`/organizations/${orgId}/crm/contacts`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  crmDeals: (orgId: string) =>
+    fetchJson<import("@nexus/shared").CrmDeal[]>(`/organizations/${orgId}/crm/deals`),
+  createCrmDeal: (
+    orgId: string,
+    body: { title: string; value: number; stage?: import("@nexus/shared").CrmDeal["stage"] },
+  ) =>
+    fetchJson<import("@nexus/shared").CrmDeal>(`/organizations/${orgId}/crm/deals`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  orgAutomationRules: (orgId: string) =>
+    fetchJson<import("@nexus/shared").OrgAutomationRule[]>(`/organizations/${orgId}/automation-rules`),
+  createOrgAutomationRule: (
+    orgId: string,
+    body: { name: string; event: string; actionType: "notify" | "webhook"; enabled?: boolean },
+  ) =>
+    fetchJson<import("@nexus/shared").OrgAutomationRule>(`/organizations/${orgId}/automation-rules`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  subscriptionPlans: () =>
+    fetchJson<import("@nexus/shared").SubscriptionPlan[]>("/billing/plans"),
+  billingCheckout: (orgId: string, planId: string) =>
+    fetchJson<{ url?: string; mock?: boolean; planId: string }>(`/organizations/${orgId}/billing/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ planId }),
+    }),
+  taskPermissions: (projectId: string, taskId?: string) => {
+    const q = taskId ? `?taskId=${encodeURIComponent(taskId)}` : "";
+    return fetchJson<import("@nexus/shared").TaskPermission[]>(
+      `/projects/${projectId}/task-permissions${q}`,
+    );
+  },
+  setTaskPermission: (
+    projectId: string,
+    body: { taskId: string; userId: string; level: import("@nexus/shared").TaskPermissionLevel },
+  ) =>
+    fetchJson<import("@nexus/shared").TaskPermission>(`/projects/${projectId}/task-permissions`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  proofAssets: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProofAsset[]>(`/projects/${projectId}/proofs`),
+  createProof: (projectId: string, body: { title: string; taskId?: string; fileUrl?: string }) =>
+    fetchJson<import("@nexus/shared").ProofAsset>(`/projects/${projectId}/proofs`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  reviewProof: (
+    projectId: string,
+    proofId: string,
+    body: { status: "approved" | "rejected"; reviewerNote?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").ProofAsset>(`/projects/${projectId}/proofs/${proofId}`, {
+      method: "PATCH",
       body: JSON.stringify(body),
     }),
 };

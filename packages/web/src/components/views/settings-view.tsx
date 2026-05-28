@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { OrgWorkspacePanel } from "@/components/features/org-workspace-panel";
 
 const MORE_SECTIONS: { id: AppSection; labelKey: string }[] = [
+  { id: "enterprise", labelKey: "nav.enterprise" },
   { id: "timesheets", labelKey: "nav.timesheets" },
   { id: "team", labelKey: "nav.team" },
   { id: "budget", labelKey: "nav.budget" },
