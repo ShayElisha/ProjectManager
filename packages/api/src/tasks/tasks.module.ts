@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { BudgetModule } from "../budget/budget.module";
+import { IntegrationsModule } from "../integrations/integrations.module";
 import { TasksController } from "./tasks.controller";
 import { TasksService } from "./tasks.service";
 import {
@@ -8,7 +9,7 @@ import {
 } from "./task-collaboration.controller";
 
 @Module({
-  imports: [BudgetModule],
+  imports: [BudgetModule, forwardRef(() => IntegrationsModule)],
   controllers: [TasksController, TaskCollaborationController, AttachmentsDownloadController],
   providers: [TasksService],
   exports: [TasksService],

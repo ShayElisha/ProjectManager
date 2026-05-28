@@ -24,6 +24,34 @@ export function RoadmapView() {
     [tasks],
   );
 
+  const timeline = useMemo(() => {
+    if (epics.length === 0) return { min: "", max: "", span: 1 };
+    const starts = epics.map((e) => e.startDate);
+    const ends = epics.map((e) => e.endDate);
+    const min = starts.reduce((a, b) => (a < b ? a : b));
+    const max = ends.reduce((a, b) => (a > b ? a : b));
+    const span = Math.max(
+      1,
+      Math.round((new Date(max).getTime() - new Date(min).getTime()) / 86400000),
+    );
+    return { min, max, span };
+  }, [epics]);
+
+  const epicOffset = (start: string) => {
+    const offset = Math.round(
+      (new Date(start).getTime() - new Date(timeline.min).getTime()) / 86400000,
+    );
+    return Math.max(0, (offset / timeline.span) * 100);
+  };
+
+  const epicWidth = (start: string, end: string) => {
+    const days = Math.max(
+      1,
+      Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000),
+    );
+    return Math.min(100, (days / timeline.span) * 100);
+  };
+
   const createCycle = async () => {
     if (!projectId || !cycleName.trim()) return;
     const start = new Date().toISOString().slice(0, 10);
@@ -53,6 +81,38 @@ export function RoadmapView() {
           {t("features.addCycle")}
         </Button>
       </div>
+
+      {epics.length > 0 && (
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4">
+          <h3 className="mb-3 text-sm font-semibold">{t("roadmap.timeline")}</h3>
+          <p className="mb-2 text-xs text-[var(--muted)]">
+            {timeline.min} → {timeline.max}
+          </p>
+          <div className="space-y-2">
+            {epics.map((e) => (
+              <div key={e.id} className="flex items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  className="w-32 shrink-0 truncate text-start text-[var(--accent)] hover:underline"
+                  onClick={() => setSelectedTaskId(e.id)}
+                >
+                  {e.name}
+                </button>
+                <div className="relative h-6 min-w-0 flex-1 rounded bg-[var(--border)]/40">
+                  <div
+                    className="absolute top-0 h-full rounded bg-[var(--accent)]/70"
+                    style={{
+                      left: `${epicOffset(e.startDate)}%`,
+                      width: `${epicWidth(e.startDate, e.endDate)}%`,
+                    }}
+                    title={`${e.startDate} – ${e.endDate}`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {cycles.map((cycle) => {

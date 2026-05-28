@@ -27,7 +27,9 @@ export type ViewMode =
   | "calendar"
   | "timeline"
   | "backlog"
-  | "roadmap";
+  | "roadmap"
+  | "whiteboard"
+  | "docs";
 
 export type IssueType = "epic" | "story" | "task" | "bug";
 

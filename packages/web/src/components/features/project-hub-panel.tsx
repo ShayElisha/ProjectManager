@@ -4,9 +4,14 @@ import { X, Copy, Mail } from "lucide-react";
 import type {
   ActivityLogEntry,
   AutomationRule,
+  Goal,
+  KeyResult,
   ProjectGuest,
+  ProjectIntegrations,
   ProjectMessage,
   ProjectWikiPage,
+  WebhookEvent,
+  WebhookSubscription,
 } from "@nexus/shared";
 import { api } from "@/lib/api";
 import { useAppStore } from "@/store/app-store";
@@ -22,7 +27,9 @@ export function ProjectHubPanel({ onClose }: Props) {
   const { t } = useTranslation();
   const activeProjectId = useAppStore((s) => s.activeProjectId);
   const user = useAuthStore((s) => s.user);
-  const [tab, setTab] = useState<"activity" | "chat" | "wiki" | "guests" | "automation">("activity");
+  const [tab, setTab] = useState<
+    "activity" | "chat" | "wiki" | "guests" | "automation" | "integrations" | "goals"
+  >("activity");
   const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
   const [messages, setMessages] = useState<ProjectMessage[]>([]);
   const [wiki, setWiki] = useState<ProjectWikiPage[]>([]);
@@ -33,21 +40,41 @@ export function ProjectHubPanel({ onClose }: Props) {
   const [wikiContent, setWikiContent] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [emailTo, setEmailTo] = useState("");
+  const [integrations, setIntegrations] = useState<ProjectIntegrations | null>(null);
+  const [webhooks, setWebhooks] = useState<WebhookSubscription[]>([]);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [slackUrl, setSlackUrl] = useState("");
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
+  const [goalTitle, setGoalTitle] = useState("");
+  const [goalPeriod, setGoalPeriod] = useState("");
+  const [krTitle, setKrTitle] = useState("");
+  const [krTarget, setKrTarget] = useState(100);
+  const [selectedGoalId, setSelectedGoalId] = useState("");
 
   const load = useCallback(async () => {
     if (!activeProjectId) return;
-    const [a, m, w, g, r] = await Promise.all([
+    const [a, m, w, g, r, integ, hooks, gl, kr] = await Promise.all([
       api.activityLogs(activeProjectId),
       api.projectMessages(activeProjectId),
       api.wikiPages(activeProjectId),
       api.projectGuests(activeProjectId),
       api.automationRules(activeProjectId),
+      api.projectIntegrations(activeProjectId),
+      api.webhooks(activeProjectId),
+      api.goals(activeProjectId),
+      api.keyResults(activeProjectId),
     ]);
     setActivity(a);
     setMessages(m);
     setWiki(w);
     setGuests(g);
     setRules(r);
+    setIntegrations(integ);
+    setWebhooks(hooks);
+    setSlackUrl(integ.slackWebhookUrl ?? "");
+    setGoals(gl);
+    setKeyResults(kr);
     if (w[0]) {
       setWikiTitle(w[0].title);
       setWikiContent(w[0].content);
@@ -123,7 +150,47 @@ export function ProjectHubPanel({ onClose }: Props) {
     { id: "wiki" as const, label: t("hub.wiki") },
     { id: "guests" as const, label: t("hub.guests") },
     { id: "automation" as const, label: t("hub.automation") },
+    { id: "integrations" as const, label: t("integrations.title") },
+    { id: "goals" as const, label: t("goals.title") },
   ];
+
+  const saveIntegrations = async () => {
+    if (!activeProjectId) return;
+    const next = await api.updateProjectIntegrations(activeProjectId, {
+      slackWebhookUrl: slackUrl.trim() || undefined,
+    });
+    setIntegrations(next);
+    toast.success(t("integrations.saved"));
+  };
+
+  const addWebhook = async () => {
+    if (!activeProjectId || !webhookUrl.trim()) return;
+    const events: WebhookEvent[] = ["task.created", "task.updated"];
+    await api.createWebhook(activeProjectId, { url: webhookUrl.trim(), events });
+    setWebhookUrl("");
+    await load();
+  };
+
+  const addGoal = async () => {
+    if (!activeProjectId || !goalTitle.trim()) return;
+    await api.createGoal(activeProjectId, {
+      title: goalTitle.trim(),
+      period: goalPeriod.trim() || new Date().getFullYear().toString(),
+    });
+    setGoalTitle("");
+    await load();
+  };
+
+  const addKr = async () => {
+    if (!activeProjectId || !selectedGoalId || !krTitle.trim()) return;
+    await api.createKeyResult(activeProjectId, {
+      goalId: selectedGoalId,
+      title: krTitle.trim(),
+      targetValue: krTarget,
+    });
+    setKrTitle("");
+    await load();
+  };
 
   return (
     <div className="fixed inset-y-0 end-0 z-50 flex w-full max-w-md flex-col border-s border-[var(--border)] bg-[var(--card)] shadow-xl">
@@ -237,6 +304,141 @@ export function ProjectHubPanel({ onClose }: Props) {
                 );
               })}
             </ul>
+          </div>
+        )}
+        {tab === "integrations" && integrations && (
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">{t("integrations.slack")}</p>
+              <input
+                className="w-full rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                value={slackUrl}
+                onChange={(e) => setSlackUrl(e.target.value)}
+                placeholder="https://hooks.slack.com/..."
+              />
+              <Button type="button" size="sm" className="mt-2" variant="outline" onClick={() => void saveIntegrations()}>
+                {t("integrations.saveSlack")}
+              </Button>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">{t("integrations.zapier")}</p>
+              <code className="block break-all rounded bg-[var(--border)]/30 p-2 text-xs">
+                POST {window.location.origin}/api/public/zapier/{integrations.zapierHookToken}
+              </code>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">{t("integrations.emailInbound")}</p>
+              <code className="block break-all rounded bg-[var(--border)]/30 p-2 text-xs">
+                POST /api/public/inbound-email/{activeProjectId}
+                <br />
+                Header: X-Inbound-Secret: {integrations.emailInboundSecret}
+              </code>
+            </div>
+            <div className="border-t border-[var(--border)] pt-3">
+              <p className="mb-2 text-xs font-medium">{t("integrations.webhooks")}</p>
+              <ul className="mb-2 space-y-1">
+                {webhooks.map((h) => (
+                  <li key={h.id} className="truncate text-xs text-[var(--muted)]">
+                    {h.url}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+                <Button type="button" size="sm" onClick={() => void addWebhook()}>
+                  {t("integrations.addWebhook")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {tab === "goals" && (
+          <div className="space-y-4 text-sm">
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="flex-1 rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                placeholder={t("goals.goalTitle")}
+                value={goalTitle}
+                onChange={(e) => setGoalTitle(e.target.value)}
+              />
+              <input
+                className="w-24 rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                placeholder={t("goals.period")}
+                value={goalPeriod}
+                onChange={(e) => setGoalPeriod(e.target.value)}
+              />
+              <Button type="button" size="sm" onClick={() => void addGoal()}>
+                {t("goals.addGoal")}
+              </Button>
+            </div>
+            <ul className="space-y-3">
+              {goals.map((g) => {
+                const krs = keyResults.filter((k) => k.goalId === g.id);
+                const progress =
+                  krs.length === 0
+                    ? 0
+                    : Math.round(
+                        krs.reduce((s, k) => s + Math.min(100, (k.currentValue / k.targetValue) * 100), 0) /
+                          krs.length,
+                      );
+                return (
+                  <li key={g.id} className="rounded-lg border border-[var(--border)] p-2">
+                    <p className="font-medium">{g.title}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {g.period} · {progress}%
+                    </p>
+                    <ul className="mt-2 space-y-1 ps-2">
+                      {krs.map((kr) => (
+                        <li key={kr.id} className="flex items-center justify-between gap-2">
+                          <span>{kr.title}</span>
+                          <span className="tabular-nums text-xs">
+                            {kr.currentValue}/{kr.targetValue}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+            {goals.length > 0 && (
+              <div className="border-t border-[var(--border)] pt-3">
+                <select
+                  className="mb-2 w-full rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                  value={selectedGoalId}
+                  onChange={(e) => setSelectedGoalId(e.target.value)}
+                >
+                  <option value="">{t("goals.pickGoal")}</option>
+                  {goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                    value={krTitle}
+                    onChange={(e) => setKrTitle(e.target.value)}
+                    placeholder={t("goals.krTitle")}
+                  />
+                  <input
+                    type="number"
+                    className="w-16 rounded border border-[var(--border)] bg-transparent px-2 py-1"
+                    value={krTarget}
+                    onChange={(e) => setKrTarget(Number(e.target.value))}
+                  />
+                  <Button type="button" size="sm" onClick={() => void addKr()}>
+                    {t("goals.addKr")}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {tab === "automation" && (

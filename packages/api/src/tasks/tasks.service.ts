@@ -18,12 +18,14 @@ import type { Task, TaskDependency } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { runAutomationRules } from "../automation/automation.runner";
+import { WebhookDispatcherService } from "../integrations/webhook-dispatcher.service";
 
 @Injectable()
 export class TasksService {
   constructor(
     private readonly db: DataStoreService,
     @Optional() private readonly realtime?: RealtimeGateway,
+    @Optional() private readonly webhooks?: WebhookDispatcherService,
   ) {}
 
   private emit(projectId: string, event: string, payload: unknown): void {
@@ -137,6 +139,10 @@ export class TasksService {
       summary: `Updated «${updated.name}»`,
     });
     runAutomationRules(this.db, projectId, updated, current, merged);
+    void this.webhooks?.dispatch(projectId, "task.updated", {
+      taskId: updated.id,
+      name: updated.name,
+    });
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
     this.emit(projectId, "task:updated", updated);
@@ -173,6 +179,7 @@ export class TasksService {
       status: "not_started",
     });
     this.emit(projectId, "task:created", task);
+    void this.webhooks?.dispatch(projectId, "task.created", { taskId: task.id, name: task.name });
     return task;
   }
 
@@ -597,6 +604,7 @@ export class TasksService {
     const result = await this.db.deleteTask(projectId, taskId);
     if (!result) throw new NotFoundException(`Task ${taskId} not found`);
 
+    void this.webhooks?.dispatch(projectId, "task.deleted", { taskId, name: task.name });
     await this.recalculate(projectId);
     return { deletedIds: result.deletedIds };
   }

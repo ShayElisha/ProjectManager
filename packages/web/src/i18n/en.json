@@ -27,7 +27,9 @@
     "calendar": "Calendar",
     "timeline": "Timeline",
     "backlog": "Backlog",
-    "roadmap": "Roadmap"
+    "roadmap": "Roadmap",
+    "whiteboard": "Whiteboard",
+    "docs": "Docs"
   },
   "confirm": {
     "cancel": "Cancel",
@@ -655,7 +657,50 @@
     "cashflow": "Cash Flow Report",
     "lateTasks": "Late tasks",
     "openProject": "Open in project",
-    "openBudget": "Open full budget"
+    "openBudget": "Open full budget",
+    "exportPdf": "Export PDF",
+    "customBuilder": "Custom report builder",
+    "customName": "Report name",
+    "saveCustom": "Save layout",
+    "customSaved": "Report layout saved",
+    "customApplied": "Applied «{{name}}»",
+    "widget": {
+      "status": "Status & EVM",
+      "resources": "Resources",
+      "cashflow": "Cash flow",
+      "task_list": "Task list"
+    }
+  },
+  "roadmap": {
+    "timeline": "Epic timeline"
+  },
+  "whiteboard": {
+    "notePlaceholder": "Sticky note text…",
+    "addNote": "Add note",
+    "remove": "Remove",
+    "empty": "Add sticky notes for brainstorming"
+  },
+  "docs": {
+    "newPage": "New page"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "slack": "Slack incoming webhook",
+    "saveSlack": "Save Slack",
+    "zapier": "Zapier / Make hook URL",
+    "emailInbound": "Email-to-task (POST)",
+    "webhooks": "Outbound webhooks",
+    "addWebhook": "Add",
+    "saved": "Integration settings saved"
+  },
+  "goals": {
+    "title": "Goals & OKR",
+    "goalTitle": "Objective",
+    "period": "Period",
+    "addGoal": "Add goal",
+    "pickGoal": "Select goal",
+    "krTitle": "Key result",
+    "addKr": "Add KR"
   },
   "budget": {
     "title": "Budget & cash flow",

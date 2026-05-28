@@ -688,6 +688,82 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  customReports: (projectId: string) =>
+    fetchJson<import("@nexus/shared").CustomReport[]>(`/projects/${projectId}/custom-reports`),
+  createCustomReport: (
+    projectId: string,
+    body: { name: string; widgets: import("@nexus/shared").ReportWidgetType[] },
+  ) =>
+    fetchJson<import("@nexus/shared").CustomReport>(`/projects/${projectId}/custom-reports`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  webhooks: (projectId: string) =>
+    fetchJson<import("@nexus/shared").WebhookSubscription[]>(`/projects/${projectId}/webhooks`),
+  createWebhook: (
+    projectId: string,
+    body: { url: string; events: import("@nexus/shared").WebhookEvent[]; secret?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").WebhookSubscription>(`/projects/${projectId}/webhooks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  projectIntegrations: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProjectIntegrations>(`/projects/${projectId}/integrations`),
+  updateProjectIntegrations: (
+    projectId: string,
+    body: Partial<import("@nexus/shared").ProjectIntegrations>,
+  ) =>
+    fetchJson<import("@nexus/shared").ProjectIntegrations>(`/projects/${projectId}/integrations`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  goals: (projectId: string) =>
+    fetchJson<import("@nexus/shared").Goal[]>(`/projects/${projectId}/goals`),
+  createGoal: (projectId: string, body: { title: string; period: string }) =>
+    fetchJson<import("@nexus/shared").Goal>(`/projects/${projectId}/goals`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  keyResults: (projectId: string, goalId?: string) => {
+    const q = goalId ? `?goalId=${encodeURIComponent(goalId)}` : "";
+    return fetchJson<import("@nexus/shared").KeyResult[]>(`/projects/${projectId}/key-results${q}`);
+  },
+  createKeyResult: (
+    projectId: string,
+    body: { goalId: string; title: string; targetValue: number; unit?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").KeyResult>(`/projects/${projectId}/key-results`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateKeyResult: (
+    projectId: string,
+    krId: string,
+    body: { currentValue?: number; title?: string; targetValue?: number },
+  ) =>
+    fetchJson<import("@nexus/shared").KeyResult>(`/projects/${projectId}/key-results/${krId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  whiteboard: (projectId: string) =>
+    fetchJson<import("@nexus/shared").WhiteboardItem[]>(`/projects/${projectId}/whiteboard`),
+  saveWhiteboardItem: (
+    projectId: string,
+    body: { id?: string; x: number; y: number; text: string; color?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").WhiteboardItem>(`/projects/${projectId}/whiteboard`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteWhiteboardItem: (projectId: string, itemId: string) =>
+    fetchJson<{ ok: boolean }>(`/projects/${projectId}/whiteboard/${itemId}`, { method: "DELETE" }),
+
   createRecurringTasks: (
     projectId: string,
     body: Partial<Task> & { recurrenceRule: import("@nexus/shared").RecurrenceRule },

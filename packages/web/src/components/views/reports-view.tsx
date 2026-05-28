@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProjectStatusReport, ResourceLoadReport, CashFlowReport } from "@nexus/shared";
+import { FileDown } from "lucide-react";
+import type {
+  ProjectStatusReport,
+  ResourceLoadReport,
+  CashFlowReport,
+  ReportWidgetType,
+} from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
 import { api } from "@/lib/api";
 import { EvmDashboard } from "@/components/evm-dashboard";
+import { CustomReportBuilder } from "@/components/features/custom-report-builder";
+import { exportReportsPdf } from "@/lib/reports-pdf";
 import { cn } from "@/lib/utils";
 import { ViewSkeleton } from "@/components/ui/view-skeleton";
+import { Button } from "@/components/ui/button";
 
 export function ReportsView() {
   const { t } = useTranslation();
@@ -19,6 +28,11 @@ export function ReportsView() {
   const [resources, setResources] = useState<ResourceLoadReport | null>(null);
   const [cashflow, setCashflow] = useState<CashFlowReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [widgets, setWidgets] = useState<ReportWidgetType[]>([
+    "status",
+    "resources",
+    "cashflow",
+  ]);
 
   useEffect(() => {
     if (activeProjectId) setProjectId(activeProjectId);
@@ -90,11 +104,37 @@ export function ReportsView() {
         >
           {t("reports.openBudget")}
         </button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!status}
+          onClick={() =>
+            exportReportsPdf({
+              projectName: selectedProject?.name ?? "",
+              status,
+              resources,
+              cashflow,
+              title: t("reports.title"),
+            })
+          }
+        >
+          <FileDown size={14} />
+          {t("reports.exportPdf")}
+        </Button>
       </div>
+
+      {projectId && (
+        <CustomReportBuilder
+          projectId={projectId}
+          selected={widgets}
+          onSelectedChange={setWidgets}
+        />
+      )}
 
       {loading && !status && <ViewSkeleton variant="detail" />}
 
-      {status && (
+      {status && widgets.includes("status") && (
         <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6">
           <div className="flex items-start justify-between">
             <div>
@@ -151,7 +191,7 @@ export function ReportsView() {
         </section>
       )}
 
-      {resources && (
+      {resources && widgets.includes("resources") && (
         <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6">
           <h3 className="mb-4 font-semibold">{t("reports.resourceReport")}</h3>
           <table className="w-full text-sm">
@@ -179,7 +219,7 @@ export function ReportsView() {
         </section>
       )}
 
-      {cashflow && cashflow.points.length > 0 && (
+      {cashflow && cashflow.points.length > 0 && widgets.includes("cashflow") && (
         <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6">
           <h3 className="mb-4 font-semibold">{t("reports.cashflow")}</h3>
           <div className="space-y-3">

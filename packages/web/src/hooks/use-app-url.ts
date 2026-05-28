@@ -11,6 +11,8 @@ const VIEW_MODES: ViewMode[] = [
   "timeline",
   "backlog",
   "roadmap",
+  "whiteboard",
+  "docs",
 ];
 
 const SECTIONS: AppSection[] = [

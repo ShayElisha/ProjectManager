@@ -18,6 +18,7 @@ import { ChangesModule } from "./changes/changes.module";
 import { RejectionsModule } from "./rejections/rejections.module";
 import { DatabaseModule } from "./database/database.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { IntegrationsModule } from "./integrations/integrations.module";
 
 const realtimeModules = process.env.VERCEL ? [] : [RealtimeModule];
 
@@ -28,6 +29,7 @@ const realtimeModules = process.env.VERCEL ? [] : [RealtimeModule];
     OrganizationsModule,
     SearchModule,
     ProjectFeaturesModule,
+    IntegrationsModule,
     ...realtimeModules,
     ProjectsModule,
     TasksModule,

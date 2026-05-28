@@ -29,16 +29,16 @@ id,feature_en,feature_he,level,status,priority,phase_week,effort,notes
 28,Team chat messages,צאט צוות,Standard,done,P4,20,XL,Out of core PM scope
 29,Integrated wiki docs,Wiki Docs משולב,Standard,done,P4,20,XL,Notion competitor
 30,External guest sharing,שיתוף guests חיצוניים,Standard,done,P2,11,L,After RBAC
-31,Custom report builder,בונה דוחות מותאם,Standard,missing,P3,18,L,Fixed reports exist
-32,PDF report export,ייצוא PDF דוחות,Standard,missing,P2,8,M,jsPDF or server PDF
-33,Zapier Make integrations,Zapier Make,Standard,missing,P2,17,M,Webhook triggers
-34,Outbound webhooks,Webhooks יוצאים,Standard,missing,P1,10,M,Event subscriptions
-35,Jira Slack GitHub email integrations,אינטגרציות Jira Slack GitHub,Standard,missing,P3,18-19,XL,Pick one first: Slack
-36,Goals OKR,Goals OKR,Standard,missing,P4,19,L,Separate module
-37,Product roadmap view,Roadmap מוצר,Standard,missing,P3,16,M,Timeline by epic
-38,Integrated docs module,Docs משולבים,Standard,missing,P4,20,XL,
-39,Whiteboard,Whiteboard,Standard,missing,P4,20,XL,
-40,Email to task,Email to task,Standard,missing,P3,10,M,Inbound parse
+31,Custom report builder,בונה דוחות מותאם,Standard,done,P3,18,L,Fixed reports exist
+32,PDF report export,ייצוא PDF דוחות,Standard,done,P2,8,M,jsPDF or server PDF
+33,Zapier Make integrations,Zapier Make,Standard,done,P2,17,M,Webhook triggers
+34,Outbound webhooks,Webhooks יוצאים,Standard,done,P1,10,M,Event subscriptions
+35,Jira Slack GitHub email integrations,אינטגרציות Jira Slack GitHub,Standard,done,P3,18-19,XL,Pick one first: Slack
+36,Goals OKR,Goals OKR,Standard,done,P4,19,L,Separate module
+37,Product roadmap view,Roadmap מוצר,Standard,done,P3,16,M,Timeline by epic
+38,Integrated docs module,Docs משולבים,Standard,done,P4,20,XL,
+39,Whiteboard,Whiteboard,Standard,done,P4,20,XL,
+40,Email to task,Email to task,Standard,done,P3,10,M,Inbound parse
 41,PWA offline,PWA Offline,Standard,missing,P3,19,L,Service worker + cache
 42,Full keyboard shortcuts,קיצורי מקלדת מלאים,Standard,missing,P3,2,S,Extend command palette
 43,Formula custom fields,נוסחאות בשדות מותאמים,Advanced,missing,P3,7,XL,After custom fields

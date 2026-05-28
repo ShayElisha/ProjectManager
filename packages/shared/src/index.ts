@@ -12,3 +12,4 @@ export * from "./vendor-scoring";
 export * from "./pmo";
 export * from "./risks";
 export * from "./rejections";
+export * from "./integrations";

@@ -9,6 +9,8 @@ import {
   GitBranch,
   ListTodo,
   Map,
+  StickyNote,
+  BookOpen,
   Moon,
   Sun,
   Search,
@@ -39,6 +41,8 @@ import { CalendarView } from "@/components/views/calendar-view";
 import { TimelineView } from "@/components/views/timeline-view";
 import { BacklogView } from "@/components/views/backlog-view";
 import { RoadmapView } from "@/components/views/roadmap-view";
+import { WhiteboardView } from "@/components/views/whiteboard-view";
+import { DocsView } from "@/components/views/docs-view";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { PortfolioView } from "@/components/views/portfolio-view";
 import { PmoView } from "@/components/views/pmo-view";
@@ -67,6 +71,8 @@ const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   timeline: GitBranch,
   backlog: ListTodo,
   roadmap: Map,
+  whiteboard: StickyNote,
+  docs: BookOpen,
 };
 
 type SideDrawer = "resources" | "evm" | "hub" | null;
@@ -127,6 +133,8 @@ export default function AppShell() {
     timeline: TimelineView,
     backlog: BacklogView,
     roadmap: RoadmapView,
+    whiteboard: WhiteboardView,
+    docs: DocsView,
   }[view];
 
   const handleLogout = () => {

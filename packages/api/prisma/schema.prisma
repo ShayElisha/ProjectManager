@@ -61,8 +61,64 @@ model Project {
   automationRules  AutomationRule[]
   activityLogs     ActivityLog[]
   messages         ProjectMessage[]
-  wikiPages        ProjectWikiPage[]
-  guests           ProjectGuest[]
+  wikiPages           ProjectWikiPage[]
+  guests              ProjectGuest[]
+  customReports       CustomReport[]
+  webhookSubscriptions WebhookSubscription[]
+  goals               Goal[]
+  whiteboardItems     WhiteboardItem[]
+}
+
+model CustomReport {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  name      String
+  widgets   Json
+  createdAt DateTime @default(now())
+}
+
+model WebhookSubscription {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  url       String
+  events    Json
+  secret    String?
+  enabled   Boolean @default(true)
+}
+
+model Goal {
+  id        String      @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id])
+  title     String
+  period    String
+  progress  Float       @default(0)
+  keyResults KeyResult[]
+}
+
+model KeyResult {
+  id           String @id @default(uuid()) @map("_id")
+  goalId       String
+  goal         Goal   @relation(fields: [goalId], references: [id])
+  projectId    String
+  title        String
+  targetValue  Float
+  currentValue Float  @default(0)
+  unit         String?
+}
+
+model WhiteboardItem {
+  id        String @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  x         Float
+  y         Float
+  width     Float  @default(160)
+  height    Float  @default(100)
+  text      String
+  color     String @default("#fef08a")
 }
 
 model Task {

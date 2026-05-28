@@ -1325,6 +1325,12 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.projectMessages.set(project.id, []);
     this.mem.wikiPages.set(project.id, []);
     this.mem.projectGuests.set(project.id, []);
+    this.mem.customReports.set(project.id, []);
+    this.mem.webhookSubscriptions.set(project.id, []);
+    this.mem.goals.set(project.id, []);
+    this.mem.keyResults.set(project.id, []);
+    this.mem.whiteboardItems.set(project.id, []);
+    this.mem.projectIntegrations.set(project.id, { projectId: project.id });
 
     if (this.useDb) {
       await this.prisma.project.create({ data: prismaProjectData(project) });
@@ -1461,6 +1467,201 @@ export class DataStoreService implements OnApplicationBootstrap {
       });
     }
     return guest;
+  }
+
+  getCustomReports(projectId: string): import("@nexus/shared").CustomReport[] {
+    return this.mem.customReports.get(projectId) ?? [];
+  }
+
+  async createCustomReport(
+    input: Omit<import("@nexus/shared").CustomReport, "id" | "createdAt">,
+  ): Promise<import("@nexus/shared").CustomReport> {
+    const report: import("@nexus/shared").CustomReport = {
+      ...input,
+      id: uuid(),
+      createdAt: new Date().toISOString(),
+    };
+    const list = this.mem.customReports.get(input.projectId) ?? [];
+    list.push(report);
+    this.mem.customReports.set(input.projectId, list);
+    if (this.useDb) {
+      await this.prisma.customReport.create({
+        data: { ...report, widgets: report.widgets as object },
+      });
+    }
+    return report;
+  }
+
+  getWebhooks(projectId: string): import("@nexus/shared").WebhookSubscription[] {
+    return this.mem.webhookSubscriptions.get(projectId) ?? [];
+  }
+
+  async createWebhook(
+    input: Omit<import("@nexus/shared").WebhookSubscription, "id">,
+  ): Promise<import("@nexus/shared").WebhookSubscription> {
+    const hook: import("@nexus/shared").WebhookSubscription = { ...input, id: uuid() };
+    const list = this.mem.webhookSubscriptions.get(input.projectId) ?? [];
+    list.push(hook);
+    this.mem.webhookSubscriptions.set(input.projectId, list);
+    if (this.useDb) {
+      await this.prisma.webhookSubscription.create({
+        data: { ...hook, events: hook.events as object },
+      });
+    }
+    return hook;
+  }
+
+  getProjectIntegrations(projectId: string): import("@nexus/shared").ProjectIntegrations {
+    return this.mem.projectIntegrations.get(projectId) ?? { projectId };
+  }
+
+  setProjectIntegrations(settings: import("@nexus/shared").ProjectIntegrations): void {
+    this.mem.projectIntegrations.set(settings.projectId, settings);
+  }
+
+  getGoals(projectId: string): import("@nexus/shared").Goal[] {
+    return this.mem.goals.get(projectId) ?? [];
+  }
+
+  async createGoal(
+    input: Omit<import("@nexus/shared").Goal, "id" | "progress"> & { progress?: number },
+  ): Promise<import("@nexus/shared").Goal> {
+    const goal: import("@nexus/shared").Goal = {
+      ...input,
+      id: uuid(),
+      progress: input.progress ?? 0,
+    };
+    const list = this.mem.goals.get(input.projectId) ?? [];
+    list.push(goal);
+    this.mem.goals.set(input.projectId, list);
+    if (this.useDb) {
+      await this.prisma.goal.create({ data: goal });
+    }
+    return goal;
+  }
+
+  getKeyResults(projectId: string, goalId?: string): import("@nexus/shared").KeyResult[] {
+    const all = this.mem.keyResults.get(projectId) ?? [];
+    return goalId ? all.filter((k) => k.goalId === goalId) : all;
+  }
+
+  async createKeyResult(
+    input: Omit<import("@nexus/shared").KeyResult, "id" | "currentValue"> & { currentValue?: number },
+  ): Promise<import("@nexus/shared").KeyResult> {
+    const kr: import("@nexus/shared").KeyResult = {
+      ...input,
+      id: uuid(),
+      currentValue: input.currentValue ?? 0,
+    };
+    const list = this.mem.keyResults.get(input.projectId) ?? [];
+    list.push(kr);
+    this.mem.keyResults.set(input.projectId, list);
+    if (this.useDb) {
+      await this.prisma.keyResult.create({ data: kr });
+    }
+    return kr;
+  }
+
+  async updateKeyResult(
+    projectId: string,
+    krId: string,
+    patch: Partial<import("@nexus/shared").KeyResult>,
+  ): Promise<import("@nexus/shared").KeyResult | null> {
+    const list = this.mem.keyResults.get(projectId) ?? [];
+    const idx = list.findIndex((k) => k.id === krId);
+    if (idx < 0) return null;
+    list[idx] = { ...list[idx]!, ...patch };
+    this.mem.keyResults.set(projectId, list);
+    if (this.useDb) {
+      await this.prisma.keyResult.update({
+        where: { id: krId },
+        data: {
+          title: list[idx]!.title,
+          targetValue: list[idx]!.targetValue,
+          currentValue: list[idx]!.currentValue,
+          unit: list[idx]!.unit ?? null,
+        },
+      });
+    }
+    return list[idx]!;
+  }
+
+  getWhiteboardItems(projectId: string): import("@nexus/shared").WhiteboardItem[] {
+    return this.mem.whiteboardItems.get(projectId) ?? [];
+  }
+
+  async upsertWhiteboardItem(
+    projectId: string,
+    body: Partial<import("@nexus/shared").WhiteboardItem> & {
+      id?: string;
+      text: string;
+      x: number;
+      y: number;
+    },
+  ): Promise<import("@nexus/shared").WhiteboardItem> {
+    const list = this.mem.whiteboardItems.get(projectId) ?? [];
+    const existing = body.id ? list.find((i) => i.id === body.id) : undefined;
+    const item: import("@nexus/shared").WhiteboardItem = existing
+      ? {
+          ...existing,
+          ...body,
+          projectId,
+        }
+      : {
+          id: uuid(),
+          projectId,
+          x: body.x,
+          y: body.y,
+          width: body.width ?? 160,
+          height: body.height ?? 100,
+          text: body.text,
+          color: body.color ?? "#fef08a",
+        };
+    if (existing) {
+      const idx = list.findIndex((i) => i.id === item.id);
+      list[idx] = item;
+    } else {
+      list.push(item);
+    }
+    this.mem.whiteboardItems.set(projectId, list);
+    if (this.useDb) {
+      await this.prisma.whiteboardItem.upsert({
+        where: { id: item.id },
+        create: item,
+        update: {
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          text: item.text,
+          color: item.color,
+        },
+      });
+    }
+    return item;
+  }
+
+  async deleteWhiteboardItem(projectId: string, itemId: string): Promise<boolean> {
+    const list = this.mem.whiteboardItems.get(projectId) ?? [];
+    const next = list.filter((i) => i.id !== itemId);
+    if (next.length === list.length) return false;
+    this.mem.whiteboardItems.set(projectId, next);
+    if (this.useDb) {
+      await this.prisma.whiteboardItem.delete({ where: { id: itemId } }).catch(() => undefined);
+    }
+    return true;
+  }
+
+  findProjectByZapierToken(token: string): string | undefined {
+    for (const [projectId, settings] of this.mem.projectIntegrations) {
+      if (settings.zapierHookToken === token) return projectId;
+    }
+    return undefined;
+  }
+
+  findProjectByEmailSecret(projectId: string, secret: string): boolean {
+    const settings = this.mem.projectIntegrations.get(projectId);
+    return Boolean(settings?.emailInboundSecret && settings.emailInboundSecret === secret);
   }
 
   async setTasks(projectId: string, tasks: Task[]) {

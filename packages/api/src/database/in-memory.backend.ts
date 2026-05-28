@@ -27,6 +27,12 @@ import type {
   ProjectMessage,
   ProjectWikiPage,
   ProjectGuest,
+  CustomReport,
+  WebhookSubscription,
+  ProjectIntegrations,
+  Goal,
+  KeyResult,
+  WhiteboardItem,
 } from "@nexus/shared";
 import { buildSeedData } from "./seed-data";
 
@@ -53,6 +59,12 @@ export class InMemoryBackend {
   projectMessages = new Map<string, ProjectMessage[]>();
   wikiPages = new Map<string, ProjectWikiPage[]>();
   projectGuests = new Map<string, ProjectGuest[]>();
+  customReports = new Map<string, CustomReport[]>();
+  webhookSubscriptions = new Map<string, WebhookSubscription[]>();
+  projectIntegrations = new Map<string, ProjectIntegrations>();
+  goals = new Map<string, Goal[]>();
+  keyResults = new Map<string, KeyResult[]>();
+  whiteboardItems = new Map<string, WhiteboardItem[]>();
   projects = new Map<string, Project>();
   tasks = new Map<string, Task[]>();
   dependencies = new Map<string, TaskDependency[]>();
@@ -99,6 +111,14 @@ export class InMemoryBackend {
       if (!this.projectMessages.has(p.id)) this.projectMessages.set(p.id, []);
       if (!this.wikiPages.has(p.id)) this.wikiPages.set(p.id, []);
       if (!this.projectGuests.has(p.id)) this.projectGuests.set(p.id, []);
+      if (!this.customReports.has(p.id)) this.customReports.set(p.id, []);
+      if (!this.webhookSubscriptions.has(p.id)) this.webhookSubscriptions.set(p.id, []);
+      if (!this.goals.has(p.id)) this.goals.set(p.id, []);
+      if (!this.keyResults.has(p.id)) this.keyResults.set(p.id, []);
+      if (!this.whiteboardItems.has(p.id)) this.whiteboardItems.set(p.id, []);
+      if (!this.projectIntegrations.has(p.id)) {
+        this.projectIntegrations.set(p.id, { projectId: p.id });
+      }
     }
     const lead = data.resources[0];
     if (lead) {

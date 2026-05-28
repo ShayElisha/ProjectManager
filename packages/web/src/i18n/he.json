@@ -27,7 +27,9 @@
     "calendar": "לוח שנה",
     "timeline": "ציר זמן",
     "backlog": "בקלוג",
-    "roadmap": "מפת דרכים"
+    "roadmap": "מפת דרכים",
+    "whiteboard": "לוח",
+    "docs": "מסמכים"
   },
   "confirm": {
     "cancel": "ביטול",
@@ -655,7 +657,50 @@
     "cashflow": "דוח תזרים מזומנים",
     "lateTasks": "משימות באיחור",
     "openProject": "פתח בפרויקט",
-    "openBudget": "פתח תקציב מלא"
+    "openBudget": "פתח תקציב מלא",
+    "exportPdf": "ייצוא PDF",
+    "customBuilder": "בונה דוחות מותאם",
+    "customName": "שם דוח",
+    "saveCustom": "שמור פריסה",
+    "customSaved": "פריסת הדוח נשמרה",
+    "customApplied": "הוחלה «{{name}}»",
+    "widget": {
+      "status": "סטטוס ו-EVM",
+      "resources": "משאבים",
+      "cashflow": "תזרים",
+      "task_list": "רשימת משימות"
+    }
+  },
+  "roadmap": {
+    "timeline": "ציר זמן אפיקים"
+  },
+  "whiteboard": {
+    "notePlaceholder": "טקסט פתק…",
+    "addNote": "הוסף פתק",
+    "remove": "הסר",
+    "empty": "הוסף פתקים לסיעור מוחות"
+  },
+  "docs": {
+    "newPage": "עמוד חדש"
+  },
+  "integrations": {
+    "title": "אינטגרציות",
+    "slack": "Webhook נכנס ל-Slack",
+    "saveSlack": "שמור Slack",
+    "zapier": "Zapier / Make",
+    "emailInbound": "אימייל→משימה (POST)",
+    "webhooks": "Webhooks יוצאים",
+    "addWebhook": "הוסף",
+    "saved": "הגדרות האינטגרציה נשמרו"
+  },
+  "goals": {
+    "title": "יעדים ו-OKR",
+    "goalTitle": "מטרה",
+    "period": "תקופה",
+    "addGoal": "הוסף יעד",
+    "pickGoal": "בחר יעד",
+    "krTitle": "תוצאה מפתח",
+    "addKr": "הוסף KR"
   },
   "budget": {
     "title": "תקציב ותזרים",
