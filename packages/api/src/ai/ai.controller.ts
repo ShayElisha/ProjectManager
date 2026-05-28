@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
+import type { UserAccount } from "@nexus/shared";
+import { resolveOrgFilter } from "../common/org-access";
 import { AiService, type GeneratedPlan } from "./ai.service";
 
 @Controller("ai")
@@ -11,8 +13,8 @@ export class AiController {
   }
 
   @Get("executive-summary")
-  executiveSummary() {
-    return this.ai.executiveSummary();
+  executiveSummary(@Req() req: { user: UserAccount }) {
+    return this.ai.executiveSummary(resolveOrgFilter(req.user));
   }
 
   @Post("generate-plan")

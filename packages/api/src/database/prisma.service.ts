@@ -27,12 +27,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private connected = false;
 
   async onModuleInit() {
-    if (!process.env.DATABASE_URL) return;
+    const url = process.env.DATABASE_URL?.trim() ?? "";
+    if (!url) return;
+    const isBuildStub =
+      url.includes("127.0.0.1") || url.includes("localhost") || url.includes("nexus_build");
     if (process.env.VERCEL && process.env.FORCE_DB_ON_VERCEL !== "true") {
-      this.logger.warn(
-        "Skipping DB connection on Vercel (set FORCE_DB_ON_VERCEL=true to enable persistent DB mode).",
-      );
-      return;
+      if (isBuildStub) {
+        this.logger.warn("Skipping build-time DATABASE_URL on Vercel — in-memory API mode.");
+        return;
+      }
+      // Atlas / hosted Mongo on Vercel: connect when a real URL is configured.
     }
     try {
       await withTimeout(this.$connect(), DB_CONNECT_TIMEOUT_MS, "Prisma connect");

@@ -30,8 +30,22 @@ async function getHandler(): Promise<ExpressHandler> {
 }
 
 export default async function handler(req: unknown, res: unknown) {
-  const fn = await getHandler();
-  return fn(req as Request, res as Response);
+  try {
+    const fn = await getHandler();
+    return fn(req as Request, res as Response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Server failed to start";
+    const resObj = res as Response;
+    if (typeof resObj.status === "function") {
+      resObj.status(503).json({
+        statusCode: 503,
+        message,
+        hint: "Check Vercel env: DATABASE_URL (MongoDB Atlas), JWT_SECRET. See API logs.",
+      });
+      return;
+    }
+    throw err;
+  }
 }
 
 export const config = {

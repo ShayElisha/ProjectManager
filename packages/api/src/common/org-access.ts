@@ -21,9 +21,10 @@ export function assertProjectAccess(
 }
 
 export function resolveOrgFilter(
-  user: UserAccount,
+  user: UserAccount | undefined,
   requestedOrgId?: string,
 ): string | undefined {
+  if (!user) return requestedOrgId;
   if (roleAtLeast(user.role, "admin") && requestedOrgId) return requestedOrgId;
   return user.organizationId;
 }

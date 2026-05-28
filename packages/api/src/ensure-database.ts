@@ -43,9 +43,8 @@ export async function ensureDatabaseUrl(): Promise<void> {
 
   if (process.env.VERCEL) {
     if (!url) {
-      throw new Error(
-        "DATABASE_URL is required on Vercel. Set MongoDB Atlas connection string in project Environment Variables.",
-      );
+      // Stateless in-memory mode (PrismaService skips connect unless FORCE_DB_ON_VERCEL).
+      return;
     }
     return;
   }

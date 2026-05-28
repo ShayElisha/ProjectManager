@@ -31,8 +31,8 @@ export class AiService {
     private readonly portfolio: PortfolioService,
   ) {}
 
-  executiveSummary(): ExecutiveSummary {
-    const exec = this.portfolio.getExecutive();
+  executiveSummary(organizationId?: string): ExecutiveSummary {
+    const exec = this.portfolio.getExecutive(organizationId);
     const paragraphs: string[] = [];
     const actions: string[] = [];
 
