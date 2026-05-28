@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AutomationRule,
   CustomColumn,
   Cycle,
-  Project,
   ProjectForm,
   ProjectFormField,
+  ProjectGuest,
+  ProjectMessage,
+  ProjectWikiPage,
   SavedView,
   Sprint,
   Task,
@@ -13,12 +16,14 @@ import type {
 import { v4 as uuid } from "uuid";
 import { DataStoreService } from "../database/data-store.service";
 import { TasksService } from "../tasks/tasks.service";
+import { EmailService } from "../email/email.service";
 
 @Injectable()
 export class ProjectFeaturesService {
   constructor(
     private readonly db: DataStoreService,
     private readonly tasks: TasksService,
+    private readonly email: EmailService,
   ) {}
 
   moveTask(sourceProjectId: string, taskId: string, targetProjectId: string) {
@@ -126,5 +131,68 @@ export class ProjectFeaturesService {
     const { recurrenceRule, ...rest } = body;
     const base = this.tasks.buildTaskBase(projectId, rest);
     return this.db.generateRecurringTasks(projectId, base, recurrenceRule);
+  }
+
+  listAutomationRules(projectId: string) {
+    return this.db.getAutomationRules(projectId);
+  }
+
+  createAutomationRule(projectId: string, body: Omit<AutomationRule, "id" | "projectId">) {
+    return this.db.createAutomationRule({ ...body, id: uuid(), projectId });
+  }
+
+  getActivity(projectId: string) {
+    return this.db.getActivityLogs(projectId);
+  }
+
+  listMessages(projectId: string) {
+    return this.db.getProjectMessages(projectId);
+  }
+
+  postMessage(projectId: string, body: { userId: string; userName: string; text: string }) {
+    return this.db.addProjectMessage({
+      projectId,
+      userId: body.userId,
+      userName: body.userName,
+      body: body.text,
+    });
+  }
+
+  listWiki(projectId: string) {
+    return this.db.getWikiPages(projectId);
+  }
+
+  saveWiki(projectId: string, body: { id?: string; title: string; content: string }) {
+    return this.db.upsertWikiPage(projectId, body);
+  }
+
+  listGuests(projectId: string) {
+    return this.db.getProjectGuests(projectId);
+  }
+
+  inviteGuest(projectId: string, body: { email: string; name?: string }) {
+    return this.db.createProjectGuest({
+      projectId,
+      email: body.email,
+      name: body.name,
+      role: "viewer",
+    });
+  }
+
+  getGuestProject(token: string) {
+    const guest = this.db.getGuestByToken(token);
+    if (!guest) throw new NotFoundException("Invalid guest link");
+    const project = this.db.getProject(guest.projectId);
+    if (!project) throw new NotFoundException("Project not found");
+    return {
+      guest,
+      project,
+      tasks: this.db.getTasks(guest.projectId),
+    };
+  }
+
+  async notifyEmail(to: string, subject: string, body: string) {
+    const sent = await this.email.send(to, subject, body);
+    return { sent };
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Paperclip, Send, X } from "lucide-react";
 import type { TaskAttachment, TaskComment } from "@nexus/shared";
@@ -16,12 +16,31 @@ interface Props {
 export function TaskCollaborationSection({ taskId, tags, onTagsChange }: Props) {
   const { t } = useTranslation();
   const activeProjectId = useAppStore((s) => s.activeProjectId);
+  const members = useAppStore((s) => s.members);
+  const projectResources = useAppStore((s) => s.projectResources);
   const user = useAuthStore((s) => s.user);
+
+  const mentionNames = useMemo(() => {
+    const byId = new Map(projectResources.map((r) => [r.id, r.name]));
+    return members
+      .map((m) => byId.get(m.resourceId))
+      .filter((n): n is string => Boolean(n));
+  }, [members, projectResources]);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+
+  const insertMention = (name: string) => {
+    setCommentText((prev) => {
+      const at = prev.lastIndexOf("@");
+      if (at >= 0) return `${prev.slice(0, at)}@${name} `;
+      return `${prev}@${name} `;
+    });
+    setMentionOpen(false);
+  };
 
   const load = useCallback(async () => {
     if (!activeProjectId) return;
@@ -118,17 +137,36 @@ export function TaskCollaborationSection({ taskId, tags, onTagsChange }: Props) 
             </li>
           ))}
         </ul>
-        <div className="mt-2 flex gap-2">
+        <div className="relative mt-2 flex gap-2">
           <input
             className="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={(e) => {
+              setCommentText(e.target.value);
+              setMentionOpen(e.target.value.endsWith("@") || /@[\w\u0590-\u05FF.-]*$/.test(e.target.value));
+            }}
             placeholder={t("features.commentPlaceholder")}
           />
           <Button type="button" size="sm" onClick={() => void addComment()} disabled={busy}>
             <Send size={14} />
           </Button>
+          {mentionOpen && mentionNames.length > 0 && (
+            <ul className="absolute bottom-full start-0 z-10 mb-1 max-h-32 w-full overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-lg">
+              {mentionNames.map((name) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    className="w-full px-2 py-1 text-start text-sm hover:bg-[var(--accent)]/10"
+                    onClick={() => insertMention(name)}
+                  >
+                    @{name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+        <p className="mt-1 text-[10px] text-[var(--muted)]">{t("features.mentionHint")}</p>
       </div>
 
       <div>

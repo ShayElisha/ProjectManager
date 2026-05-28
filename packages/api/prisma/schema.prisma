@@ -57,7 +57,12 @@ model Project {
   sprints        Sprint[]
   cycles         Cycle[]
   forms          ProjectForm[]
-  savedViews     SavedView[]
+  savedViews       SavedView[]
+  automationRules  AutomationRule[]
+  activityLogs     ActivityLog[]
+  messages         ProjectMessage[]
+  wikiPages        ProjectWikiPage[]
+  guests           ProjectGuest[]
 }
 
 model Task {
@@ -165,6 +170,63 @@ model SavedView {
   name      String
   viewMode  String
   filters   Json    @default("{}")
+  columns   Json?
+}
+
+model AutomationRule {
+  id            String  @id @default(uuid()) @map("_id")
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id])
+  name          String
+  enabled       Boolean @default(true)
+  triggerField  String
+  triggerOp     String
+  triggerValue  Json?
+  actionType    String
+  actionPayload Json?
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid()) @map("_id")
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+  userId     String?
+  userName   String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  createdAt  DateTime @default(now())
+}
+
+model ProjectMessage {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    String
+  userName  String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model ProjectWikiPage {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  title     String
+  content   String
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectGuest {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  email     String
+  name      String?
+  role      String   @default("viewer")
+  token     String   @unique
+  createdAt DateTime @default(now())
 }
 
 model TaskComment {

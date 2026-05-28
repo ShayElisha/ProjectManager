@@ -18,6 +18,7 @@ import {
   Users,
   FolderPlus,
   Radio,
+  UsersRound,
 } from "lucide-react";
 import { ViewMode } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
@@ -54,6 +55,9 @@ import { ProjectConfigPanel } from "@/components/project-config-panel";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import i18n, { initI18n } from "@/i18n";
+import { useAppUrl } from "@/hooks/use-app-url";
+import { SavedViewsBar } from "@/components/features/saved-views-bar";
+import { ProjectHubPanel } from "@/components/features/project-hub-panel";
 
 const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   gantt: GanttIcon,
@@ -65,9 +69,10 @@ const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   roadmap: Map,
 };
 
-type SideDrawer = "resources" | "evm" | null;
+type SideDrawer = "resources" | "evm" | "hub" | null;
 
 export default function AppShell() {
+  useAppUrl();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -213,6 +218,15 @@ export default function AppShell() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setSideDrawer((d) => (d === "hub" ? null : "hub"))}
+                title={t("hub.openHub")}
+              >
+                <UsersRound size={14} />
+                <span className="hidden sm:inline">{t("hub.openHub")}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 className="xl:hidden"
                 onClick={() => setSideDrawer((d) => (d === "resources" ? null : "resources"))}
                 title={t("resources.title")}
@@ -308,6 +322,7 @@ export default function AppShell() {
               ) : (
                 <>
                   <ProjectToolbar />
+                  <SavedViewsBar />
                   <div className="min-h-0 flex-1">
                     <ViewComponent />
                   </div>
@@ -352,6 +367,7 @@ export default function AppShell() {
               <ResourcesPanel overlay onClose={closeDrawer} />
             )}
             {sideDrawer === "evm" && <EVMPanel overlay onClose={closeDrawer} />}
+            {sideDrawer === "hub" && <ProjectHubPanel onClose={closeDrawer} />}
           </>
         )}
       </div>

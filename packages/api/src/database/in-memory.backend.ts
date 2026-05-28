@@ -22,6 +22,11 @@ import type {
   Cycle,
   ProjectForm,
   SavedView,
+  AutomationRule,
+  ActivityLogEntry,
+  ProjectMessage,
+  ProjectWikiPage,
+  ProjectGuest,
 } from "@nexus/shared";
 import { buildSeedData } from "./seed-data";
 
@@ -43,6 +48,11 @@ export class InMemoryBackend {
   cycles = new Map<string, Cycle[]>();
   projectForms = new Map<string, ProjectForm[]>();
   savedViews = new Map<string, SavedView[]>();
+  automationRules = new Map<string, AutomationRule[]>();
+  activityLogs = new Map<string, ActivityLogEntry[]>();
+  projectMessages = new Map<string, ProjectMessage[]>();
+  wikiPages = new Map<string, ProjectWikiPage[]>();
+  projectGuests = new Map<string, ProjectGuest[]>();
   projects = new Map<string, Project>();
   tasks = new Map<string, Task[]>();
   dependencies = new Map<string, TaskDependency[]>();
@@ -84,6 +94,11 @@ export class InMemoryBackend {
       if (!this.cycles.has(p.id)) this.cycles.set(p.id, []);
       if (!this.projectForms.has(p.id)) this.projectForms.set(p.id, []);
       if (!this.savedViews.has(p.id)) this.savedViews.set(p.id, []);
+      if (!this.automationRules.has(p.id)) this.automationRules.set(p.id, []);
+      if (!this.activityLogs.has(p.id)) this.activityLogs.set(p.id, []);
+      if (!this.projectMessages.has(p.id)) this.projectMessages.set(p.id, []);
+      if (!this.wikiPages.has(p.id)) this.wikiPages.set(p.id, []);
+      if (!this.projectGuests.has(p.id)) this.projectGuests.set(p.id, []);
     }
     const lead = data.resources[0];
     if (lead) {

@@ -96,9 +96,88 @@ export class ProjectFeaturesController {
   @Post("saved-views")
   createSavedView(
     @Param("projectId") projectId: string,
-    @Body() body: { name: string; viewMode: string; filters?: Record<string, unknown>; userId?: string },
+    @Body() body: {
+      name: string;
+      viewMode: string;
+      filters?: Record<string, unknown>;
+      columns?: string[];
+      userId?: string;
+    },
   ) {
     return this.features.createSavedView(projectId, body as Parameters<ProjectFeaturesService["createSavedView"]>[1]);
+  }
+
+  @Get("automation-rules")
+  automationRules(@Param("projectId") projectId: string) {
+    return this.features.listAutomationRules(projectId);
+  }
+
+  @Post("automation-rules")
+  createAutomationRule(
+    @Param("projectId") projectId: string,
+    @Body() body: Omit<import("@nexus/shared").AutomationRule, "id" | "projectId">,
+  ) {
+    return this.features.createAutomationRule(projectId, body);
+  }
+
+  @Get("activity")
+  activity(@Param("projectId") projectId: string) {
+    return this.features.getActivity(projectId);
+  }
+
+  @Get("messages")
+  messages(@Param("projectId") projectId: string) {
+    return this.features.listMessages(projectId);
+  }
+
+  @Post("messages")
+  postMessage(
+    @Param("projectId") projectId: string,
+    @Body() body: { userId: string; userName: string; text: string },
+  ) {
+    return this.features.postMessage(projectId, body);
+  }
+
+  @Get("wiki")
+  wiki(@Param("projectId") projectId: string) {
+    return this.features.listWiki(projectId);
+  }
+
+  @Post("wiki")
+  saveWiki(
+    @Param("projectId") projectId: string,
+    @Body() body: { id?: string; title: string; content: string },
+  ) {
+    return this.features.saveWiki(projectId, body);
+  }
+
+  @Get("guests")
+  guests(@Param("projectId") projectId: string) {
+    return this.features.listGuests(projectId);
+  }
+
+  @Post("guests")
+  inviteGuest(
+    @Param("projectId") projectId: string,
+    @Body() body: { email: string; name?: string },
+  ) {
+    return this.features.inviteGuest(projectId, body);
+  }
+
+  @Post("notify-email")
+  notifyEmail(@Body() body: { to: string; subject: string; body: string }) {
+    return this.features.notifyEmail(body.to, body.subject, body.body);
+  }
+}
+
+@Public()
+@Controller("guest")
+export class GuestAccessController {
+  constructor(private readonly features: ProjectFeaturesService) {}
+
+  @Get(":token")
+  project(@Param("token") token: string) {
+    return this.features.getGuestProject(token);
   }
 }
 

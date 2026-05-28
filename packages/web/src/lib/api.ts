@@ -619,9 +619,71 @@ export const api = {
   },
   createSavedView: (
     projectId: string,
-    body: { name: string; viewMode: string; filters?: Record<string, unknown>; userId?: string },
+    body: {
+      name: string;
+      viewMode: string;
+      filters?: Record<string, unknown>;
+      columns?: string[];
+      userId?: string;
+    },
   ) =>
     fetchJson<import("@nexus/shared").SavedView>(`/projects/${projectId}/saved-views`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  automationRules: (projectId: string) =>
+    fetchJson<import("@nexus/shared").AutomationRule[]>(
+      `/projects/${projectId}/automation-rules`,
+    ),
+  createAutomationRule: (
+    projectId: string,
+    body: Omit<import("@nexus/shared").AutomationRule, "id" | "projectId">,
+  ) =>
+    fetchJson<import("@nexus/shared").AutomationRule>(`/projects/${projectId}/automation-rules`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  activityLogs: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ActivityLogEntry[]>(`/projects/${projectId}/activity`),
+
+  projectMessages: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProjectMessage[]>(`/projects/${projectId}/messages`),
+  postProjectMessage: (
+    projectId: string,
+    body: { userId: string; userName: string; text: string },
+  ) =>
+    fetchJson<import("@nexus/shared").ProjectMessage>(`/projects/${projectId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  wikiPages: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProjectWikiPage[]>(`/projects/${projectId}/wiki`),
+  saveWikiPage: (projectId: string, body: { id?: string; title: string; content: string }) =>
+    fetchJson<import("@nexus/shared").ProjectWikiPage>(`/projects/${projectId}/wiki`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  projectGuests: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProjectGuest[]>(`/projects/${projectId}/guests`),
+  inviteProjectGuest: (projectId: string, body: { email: string; name?: string }) =>
+    fetchJson<import("@nexus/shared").ProjectGuest>(`/projects/${projectId}/guests`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  guestProject: (token: string) =>
+    fetchJson<{
+      guest: import("@nexus/shared").ProjectGuest;
+      project: import("@nexus/shared").Project;
+      tasks: Task[];
+    }>(`/guest/${token}`),
+
+  notifyEmail: (projectId: string, body: { to: string; subject: string; body: string }) =>
+    fetchJson<{ sent: boolean }>(`/projects/${projectId}/notify-email`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

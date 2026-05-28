@@ -28,6 +28,11 @@ import type {
   SavedView,
   RecurrenceRule,
   SprintVelocity,
+  AutomationRule,
+  ActivityLogEntry,
+  ProjectMessage,
+  ProjectWikiPage,
+  ProjectGuest,
 } from "@nexus/shared";
 import type { StoredUserRecord } from "./in-memory.backend";
 import { riskScore as calcRiskScore } from "@nexus/shared";
@@ -756,6 +761,31 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (this.useDb) {
       await this.prisma.taskComment.create({ data: { ...comment, createdAt: new Date(comment.createdAt) } });
     }
+    const mentions = input.body.match(/@([\w\u0590-\u05FF.-]+)/g);
+    if (mentions) {
+      for (const raw of mentions) {
+        const name = raw.slice(1);
+        void this.addNotification({
+          id: uuid(),
+          userId: "pm-1",
+          type: "mention",
+          title: "Mentioned in comment",
+          body: `${input.userName} mentioned @${name} on task`,
+          read: false,
+          createdAt: new Date().toISOString(),
+          metadata: { taskId: input.taskId, commentId: comment.id },
+        });
+      }
+    }
+    this.logActivity({
+      projectId: input.projectId,
+      userId: input.userId,
+      userName: input.userName,
+      action: "comment",
+      entityType: "task",
+      entityId: input.taskId,
+      summary: `${input.userName} commented`,
+    });
     return comment;
   }
 
@@ -1290,11 +1320,147 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.cycles.set(project.id, []);
     this.mem.projectForms.set(project.id, []);
     this.mem.savedViews.set(project.id, []);
+    this.mem.automationRules.set(project.id, []);
+    this.mem.activityLogs.set(project.id, []);
+    this.mem.projectMessages.set(project.id, []);
+    this.mem.wikiPages.set(project.id, []);
+    this.mem.projectGuests.set(project.id, []);
 
     if (this.useDb) {
       await this.prisma.project.create({ data: prismaProjectData(project) });
     }
     return project;
+  }
+
+  logActivity(entry: Omit<ActivityLogEntry, "id" | "createdAt">) {
+    const row: ActivityLogEntry = {
+      ...entry,
+      id: uuid(),
+      createdAt: new Date().toISOString(),
+    };
+    const list = this.mem.activityLogs.get(entry.projectId) ?? [];
+    list.unshift(row);
+    if (list.length > 500) list.length = 500;
+    this.mem.activityLogs.set(entry.projectId, list);
+    if (this.useDb) {
+      void this.prisma.activityLog.create({
+        data: { ...row, createdAt: new Date(row.createdAt) },
+      });
+    }
+    return row;
+  }
+
+  getActivityLogs(projectId: string, limit = 100): ActivityLogEntry[] {
+    return (this.mem.activityLogs.get(projectId) ?? []).slice(0, limit);
+  }
+
+  getAutomationRules(projectId: string): AutomationRule[] {
+    return this.mem.automationRules.get(projectId) ?? [];
+  }
+
+  async createAutomationRule(rule: AutomationRule): Promise<AutomationRule> {
+    const list = this.mem.automationRules.get(rule.projectId) ?? [];
+    list.push(rule);
+    this.mem.automationRules.set(rule.projectId, list);
+    if (this.useDb) {
+      await this.prisma.automationRule.create({
+        data: {
+          ...rule,
+          triggerValue: rule.triggerValue as object | undefined,
+          actionPayload: rule.actionPayload as object | undefined,
+        },
+      });
+    }
+    return rule;
+  }
+
+  getProjectMessages(projectId: string): ProjectMessage[] {
+    return this.mem.projectMessages.get(projectId) ?? [];
+  }
+
+  async addProjectMessage(msg: Omit<ProjectMessage, "id" | "createdAt">): Promise<ProjectMessage> {
+    const row: ProjectMessage = {
+      ...msg,
+      id: uuid(),
+      createdAt: new Date().toISOString(),
+    };
+    const list = this.mem.projectMessages.get(msg.projectId) ?? [];
+    list.push(row);
+    this.mem.projectMessages.set(msg.projectId, list);
+    if (this.useDb) {
+      await this.prisma.projectMessage.create({
+        data: { ...row, createdAt: new Date(row.createdAt) },
+      });
+    }
+    return row;
+  }
+
+  getWikiPages(projectId: string): ProjectWikiPage[] {
+    return this.mem.wikiPages.get(projectId) ?? [];
+  }
+
+  async upsertWikiPage(
+    projectId: string,
+    body: { id?: string; title: string; content: string },
+  ): Promise<ProjectWikiPage> {
+    const list = this.mem.wikiPages.get(projectId) ?? [];
+    const existing = body.id ? list.find((p) => p.id === body.id) : undefined;
+    const page: ProjectWikiPage = existing
+      ? { ...existing, title: body.title, content: body.content, updatedAt: new Date().toISOString() }
+      : {
+          id: uuid(),
+          projectId,
+          title: body.title,
+          content: body.content,
+          updatedAt: new Date().toISOString(),
+        };
+    if (existing) {
+      const idx = list.findIndex((p) => p.id === page.id);
+      list[idx] = page;
+    } else {
+      list.push(page);
+    }
+    this.mem.wikiPages.set(projectId, list);
+    if (this.useDb) {
+      await this.prisma.projectWikiPage.upsert({
+        where: { id: page.id },
+        create: { ...page, updatedAt: new Date(page.updatedAt) },
+        update: { title: page.title, content: page.content, updatedAt: new Date(page.updatedAt) },
+      });
+    }
+    return page;
+  }
+
+  getProjectGuests(projectId: string): ProjectGuest[] {
+    return this.mem.projectGuests.get(projectId) ?? [];
+  }
+
+  getGuestByToken(token: string): ProjectGuest | undefined {
+    for (const guests of this.mem.projectGuests.values()) {
+      const g = guests.find((x) => x.token === token);
+      if (g) return g;
+    }
+    return undefined;
+  }
+
+  async createProjectGuest(
+    input: Omit<ProjectGuest, "id" | "token" | "createdAt">,
+  ): Promise<ProjectGuest> {
+    const guest: ProjectGuest = {
+      ...input,
+      id: uuid(),
+      token: uuid().replace(/-/g, ""),
+      createdAt: new Date().toISOString(),
+    };
+    const list = this.mem.projectGuests.get(input.projectId) ?? [];
+    list.push(guest);
+    this.mem.projectGuests.set(input.projectId, list);
+    if (this.useDb) {
+      await this.prisma.projectGuest.create({
+        data: { ...guest, createdAt: new Date(guest.createdAt) },
+      });
+    }
+    return guest;
   }
 
   async setTasks(projectId: string, tasks: Task[]) {
@@ -1314,6 +1480,10 @@ export class DataStoreService implements OnApplicationBootstrap {
     tasks[idx] = { ...tasks[idx], ...patch };
     await this.persistTask(tasks[idx]);
     return tasks[idx];
+  }
+
+  getTask(projectId: string, taskId: string): Task | undefined {
+    return this.mem.tasks.get(projectId)?.find((t) => t.id === taskId);
   }
 
   async createTask(projectId: string, task: Task) {

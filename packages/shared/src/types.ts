@@ -83,6 +83,61 @@ export interface SavedView {
   name: string;
   viewMode: ViewMode;
   filters: Record<string, unknown>;
+  columns?: string[];
+}
+
+export type AutomationTriggerOp = "eq" | "neq" | "changed";
+export type AutomationActionType = "set_status" | "notify" | "set_field";
+
+export interface AutomationRule {
+  id: string;
+  projectId: string;
+  name: string;
+  enabled: boolean;
+  triggerField: string;
+  triggerOp: AutomationTriggerOp;
+  triggerValue?: string | number | boolean;
+  actionType: AutomationActionType;
+  actionPayload?: Record<string, unknown>;
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  projectId: string;
+  userId?: string;
+  userName?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  summary: string;
+  createdAt: string;
+}
+
+export interface ProjectMessage {
+  id: string;
+  projectId: string;
+  userId: string;
+  userName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ProjectWikiPage {
+  id: string;
+  projectId: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
+export interface ProjectGuest {
+  id: string;
+  projectId: string;
+  email: string;
+  name?: string;
+  role: "viewer" | "commenter";
+  token: string;
+  createdAt: string;
 }
 
 export interface SprintVelocity {
@@ -432,7 +487,8 @@ export interface Notification {
     | "approval"
     | "over_allocation"
     | "risk_escalation"
-    | "change_pending";
+    | "change_pending"
+    | "automation";
   title: string;
   body: string;
   read: boolean;

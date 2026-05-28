@@ -19,16 +19,16 @@ id,feature_en,feature_he,level,status,priority,phase_week,effort,notes
 18,Story points velocity,Story points Velocity,Standard,done,P2,15,M,SP field + velocity endpoint
 19,Cycles product roadmap Linear style,Cycles Roadmap,Standard,done,P3,16,L,Cycle + Roadmap view
 20,Forms to create tasks,טפסים ליצירת משימות,Standard,done,P3,12,M,/f/:slug public form
-21,If-then field automation,אוטומציה If Then,Standard,missing,P2,17,L,Rule engine
-22,Saved views and filters,תצוגות ומסננים שמורים,Standard,missing,P1,6,M,Per user per project
-23,Custom column visibility,עמודות מותאמות בתצוגות,Standard,missing,P2,7,M,With custom fields
-24,URL per view and project,URL לכל תצוגה ופרויקט,Standard,missing,P1,2,M,React Router nested routes
-25,At-mentions,mentions,Standard,missing,P1,3,M,With comments + notifications
-26,Email push notifications,התראות Email Push,Standard,missing,P2,9,L,SendGrid or similar
-27,Activity feed,פיד פעילות,Standard,missing,P2,4,M,Audit-lite from events
-28,Team chat messages,צאט צוות,Standard,missing,P4,20,XL,Out of core PM scope
-29,Integrated wiki docs,Wiki Docs משולב,Standard,missing,P4,20,XL,Notion competitor
-30,External guest sharing,שיתוף guests חיצוניים,Standard,missing,P2,11,L,After RBAC
+21,If-then field automation,אוטומציה If Then,Standard,done,P2,17,L,Rule engine
+22,Saved views and filters,תצוגות ומסננים שמורים,Standard,done,P1,6,M,Per user per project
+23,Custom column visibility,עמודות מותאמות בתצוגות,Standard,done,P2,7,M,With custom fields
+24,URL per view and project,URL לכל תצוגה ופרויקט,Standard,done,P1,2,M,React Router nested routes
+25,At-mentions,mentions,Standard,done,P1,3,M,With comments + notifications
+26,Email push notifications,התראות Email Push,Standard,done,P2,9,L,SendGrid or similar
+27,Activity feed,פיד פעילות,Standard,done,P2,4,M,Audit-lite from events
+28,Team chat messages,צאט צוות,Standard,done,P4,20,XL,Out of core PM scope
+29,Integrated wiki docs,Wiki Docs משולב,Standard,done,P4,20,XL,Notion competitor
+30,External guest sharing,שיתוף guests חיצוניים,Standard,done,P2,11,L,After RBAC
 31,Custom report builder,בונה דוחות מותאם,Standard,missing,P3,18,L,Fixed reports exist
 32,PDF report export,ייצוא PDF דוחות,Standard,missing,P2,8,M,jsPDF or server PDF
 33,Zapier Make integrations,Zapier Make,Standard,missing,P2,17,M,Webhook triggers

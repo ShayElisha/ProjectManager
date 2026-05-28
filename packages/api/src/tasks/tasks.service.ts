@@ -17,6 +17,7 @@ import {
 import type { Task, TaskDependency } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
+import { runAutomationRules } from "../automation/automation.runner";
 
 @Injectable()
 export class TasksService {
@@ -127,6 +128,15 @@ export class TasksService {
 
     const updated = await this.db.updateTask(projectId, taskId, merged);
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
+
+    this.db.logActivity({
+      projectId,
+      action: "update",
+      entityType: "task",
+      entityId: taskId,
+      summary: `Updated «${updated.name}»`,
+    });
+    runAutomationRules(this.db, projectId, updated, current, merged);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
     this.emit(projectId, "task:updated", updated);

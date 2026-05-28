@@ -10,6 +10,7 @@ import { LoginPage } from "@/pages/login-page";
 import { RegisterPage } from "@/pages/register-page";
 import AppShell from "@/app-shell";
 import { PublicFormPage } from "@/pages/public-form-page";
+import { GuestProjectPage } from "@/pages/guest-project-page";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { AppToaster } from "@/components/ui/app-toaster";
 
@@ -59,6 +60,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/f/:slug" element={<PublicFormPage />} />
+          <Route path="/guest/:token" element={<GuestProjectPage />} />
           <Route
             path="/login"
             element={
@@ -77,6 +79,22 @@ export default function App() {
           />
           <Route
             path="/app"
+            element={
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/s/:section"
+            element={
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/p/:projectId/v/:view"
             element={
               <ProtectedRoute>
                 <AppShell />
