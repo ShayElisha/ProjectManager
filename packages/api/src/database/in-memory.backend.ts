@@ -33,6 +33,7 @@ import type {
   Goal,
   KeyResult,
   WhiteboardItem,
+  ResourcePto,
 } from "@nexus/shared";
 import { buildSeedData } from "./seed-data";
 
@@ -65,6 +66,7 @@ export class InMemoryBackend {
   goals = new Map<string, Goal[]>();
   keyResults = new Map<string, KeyResult[]>();
   whiteboardItems = new Map<string, WhiteboardItem[]>();
+  resourcePtos: ResourcePto[] = [];
   projects = new Map<string, Project>();
   tasks = new Map<string, Task[]>();
   dependencies = new Map<string, TaskDependency[]>();

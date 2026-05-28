@@ -764,6 +764,29 @@ export const api = {
   deleteWhiteboardItem: (projectId: string, itemId: string) =>
     fetchJson<{ ok: boolean }>(`/projects/${projectId}/whiteboard/${itemId}`, { method: "DELETE" }),
 
+  resourcePto: (projectId: string, resourceId?: string) => {
+    const q = resourceId ? `?resourceId=${encodeURIComponent(resourceId)}` : "";
+    return fetchJson<import("@nexus/shared").ResourcePto[]>(
+      `/projects/${projectId}/resources/pto${q}`,
+    );
+  },
+
+  createResourcePto: (
+    projectId: string,
+    body: { resourceId: string; startDate: string; endDate: string; label?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").ResourcePto>(`/projects/${projectId}/resources/pto`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  matchSkills: (projectId: string, skills: string) =>
+    fetchJson<import("@nexus/shared").Resource[]>(
+      `/projects/${projectId}/resources/match-skills?skills=${encodeURIComponent(skills)}`,
+    ),
+
+  llmStatus: () => fetchJson<{ enabled: boolean }>("/ai/llm-status"),
+
   createRecurringTasks: (
     projectId: string,
     body: Partial<Task> & { recurrenceRule: import("@nexus/shared").RecurrenceRule },

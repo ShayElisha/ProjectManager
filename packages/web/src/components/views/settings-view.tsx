@@ -21,6 +21,7 @@ export function SettingsView() {
   const setSection = useAppStore((s) => s.setSection);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
   const loadTeam = useAppStore((s) => s.loadTeam);
+  const activeProjectId = useAppStore((s) => s.activeProjectId);
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -67,6 +68,37 @@ export function SettingsView() {
           </Button>
         </div>
       </section>
+
+      {activeProjectId && (
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-3">
+          <h3 className="text-sm font-medium text-[var(--muted)]">{t("settings.biExport")}</h3>
+          <p className="text-xs text-[var(--muted)]">{t("settings.biHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
+              href={`/api/export/projects/${activeProjectId}/bi`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("settings.biJson")}
+            </a>
+            <a
+              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
+              href={`/api/export/projects/${activeProjectId}/bi.csv`}
+              download
+            >
+              {t("settings.biCsv")}
+            </a>
+            <a
+              className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10"
+              href={`/api/export/projects/${activeProjectId}/tasks`}
+              download
+            >
+              {t("settings.tasksCsv")}
+            </a>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-3">
         <h3 className="text-sm font-medium text-[var(--muted)]">{t("settings.moreNav")}</h3>

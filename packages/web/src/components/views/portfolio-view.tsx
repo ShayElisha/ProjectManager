@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ExecutiveSummary } from "@nexus/shared";
 import { api } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,7 @@ const HEALTH_ROW: Record<ProjectHealth, string> = {
 export function PortfolioView() {
   const { t } = useTranslation();
   const portfolio = useAppStore((s) => s.portfolio);
+  const allProjects = useAppStore((s) => s.projects);
   const loading = useAppStore((s) => s.loading);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
   const selectProject = useAppStore((s) => s.selectProject);
@@ -55,6 +56,26 @@ export function PortfolioView() {
       },
       { on_track: 0, at_risk: 0, critical: 0 } as Record<ProjectHealth, number>,
     );
+
+  const programGroups = useMemo(() => {
+    if (!portfolio) return [];
+    const groups = new Map<string, typeof portfolio.projects>();
+    for (const p of portfolio.projects) {
+      const meta = allProjects.find((ap) => ap.id === p.id);
+      const parentId = meta?.parentId ?? "root";
+      const list = groups.get(parentId) ?? [];
+      list.push(p);
+      groups.set(parentId, list);
+    }
+    return Array.from(groups.entries()).map(([parentId, projects]) => ({
+      parentId,
+      label:
+        parentId === "root"
+          ? t("program.root")
+          : allProjects.find((p) => p.id === parentId)?.name ?? parentId,
+      projects,
+    }));
+  }, [portfolio, allProjects, t]);
 
   const fmt = (n: number, currency = "ILS") =>
     new Intl.NumberFormat(undefined, {
@@ -122,7 +143,14 @@ export function PortfolioView() {
             </tr>
           </thead>
           <tbody>
-            {portfolio.projects.map((p) => (
+            {programGroups.map((group) => (
+              <Fragment key={group.parentId}>
+                <tr className="bg-[var(--bg)]/80">
+                  <td colSpan={7} className="px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]">
+                    {t("program.group")}: {group.label}
+                  </td>
+                </tr>
+                {group.projects.map((p) => (
               <tr
                 key={p.id}
                 className={cn(
@@ -188,6 +216,8 @@ export function PortfolioView() {
                   {p.cpi}/{p.spi}
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>

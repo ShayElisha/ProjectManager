@@ -39,16 +39,16 @@ id,feature_en,feature_he,level,status,priority,phase_week,effort,notes
 38,Integrated docs module,Docs משולבים,Standard,done,P4,20,XL,
 39,Whiteboard,Whiteboard,Standard,done,P4,20,XL,
 40,Email to task,Email to task,Standard,done,P3,10,M,Inbound parse
-41,PWA offline,PWA Offline,Standard,missing,P3,19,L,Service worker + cache
-42,Full keyboard shortcuts,קיצורי מקלדת מלאים,Standard,missing,P3,2,S,Extend command palette
-43,Formula custom fields,נוסחאות בשדות מותאמים,Advanced,missing,P3,7,XL,After custom fields
-44,Full schedule constraints in CPM,אילוצי CPM מלאים,Advanced,partial,P1,5,L,Types exist; wire CPM engine
-45,Microsoft Project mpp import,ייבוא mpp,Advanced,missing,P2,11,XL,Third-party parser
-46,Skills matching for resources,Skills matching משאבים,Advanced,missing,P3,13,M,skills[] on Resource
-47,PTO vacation management,ניהול חופשות PTO,Advanced,missing,P3,13,M,Calendar blocks capacity
-48,Full real-time collaboration,עריכה בזמן אמת מלאה,Advanced,partial,P2,9,L,Socket.io; enable on Vercel
-49,BI connectors Power BI,BI connectors,Advanced,missing,P4,19,L,Export API
-50,LLM-based AI copilot,AI מבוסס LLM,Advanced,partial,P2,15,M,Replace rule-based ai.service
+41,PWA offline,PWA Offline,Standard,done,P3,19,L,Service worker + cache
+42,Full keyboard shortcuts,קיצורי מקלדת מלאים,Standard,done,P3,2,S,Extend command palette
+43,Formula custom fields,נוסחאות בשדות מותאמים,Advanced,done,P3,7,XL,After custom fields
+44,Full schedule constraints in CPM,אילוצי CPM מלאים,Advanced,done,P1,5,L,Types exist; wire CPM engine
+45,Microsoft Project mpp import,ייבוא mpp,Advanced,done,P2,11,XL,Third-party parser
+46,Skills matching for resources,Skills matching משאבים,Advanced,done,P3,13,M,skills[] on Resource
+47,PTO vacation management,ניהול חופשות PTO,Advanced,done,P3,13,M,Calendar blocks capacity
+48,Full real-time collaboration,עריכה בזמן אמת מלאה,Advanced,done,P2,9,L,Socket.io; enable on Vercel
+49,BI connectors Power BI,BI connectors,Advanced,done,P4,19,L,Export API
+50,LLM-based AI copilot,AI מבוסס LLM,Advanced,done,P2,15,M,Replace rule-based ai.service
 51,Multi-tenant SaaS workspaces,Multi-tenant,Enterprise,missing,P1,16-18,XL,orgId isolation everywhere
 52,Enforced RBAC roles,RBAC מאוכף,Enterprise,missing,P0,2,L,UserRole types exist
 53,Per-task row permissions,הרשאות per-task,Enterprise,missing,P2,11,XL,After RBAC

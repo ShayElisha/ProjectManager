@@ -53,7 +53,17 @@ export function CommandPalette() {
 
   if (!open) return null;
 
-  const views = ["gantt", "grid", "kanban", "calendar", "timeline", "backlog", "roadmap"] as ViewMode[];
+  const views = [
+    "gantt",
+    "grid",
+    "kanban",
+    "calendar",
+    "timeline",
+    "backlog",
+    "roadmap",
+    "whiteboard",
+    "docs",
+  ] as ViewMode[];
   const searchableTasks = tasks
     .filter((t) => !t.isSummary)
     .slice(0, 40);

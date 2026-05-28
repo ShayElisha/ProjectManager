@@ -60,6 +60,8 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import i18n, { initI18n } from "@/i18n";
 import { useAppUrl } from "@/hooks/use-app-url";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { SavedViewsBar } from "@/components/features/saved-views-bar";
 import { ProjectHubPanel } from "@/components/features/project-hub-panel";
 
@@ -79,6 +81,9 @@ type SideDrawer = "resources" | "evm" | "hub" | null;
 
 export default function AppShell() {
   useAppUrl();
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  useKeyboardShortcuts(() => setShortcutsOpen(true));
+  const refreshTasks = useAppStore((s) => s.refreshTasks);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -110,6 +115,14 @@ export default function AppShell() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     void loadProjects();
   }, []);
+
+  useEffect(() => {
+    const socketEnabled =
+      import.meta.env.DEV || import.meta.env.VITE_ENABLE_SOCKET === "true";
+    if (socketEnabled || !activeProjectId || section !== "project") return;
+    const id = window.setInterval(() => void refreshTasks(), 20_000);
+    return () => window.clearInterval(id);
+  }, [activeProjectId, section, refreshTasks]);
 
   useEffect(() => {
     i18n.changeLanguage(locale);
@@ -382,6 +395,7 @@ export default function AppShell() {
 
       <MobileBottomNav />
       <CommandPalette />
+      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <ProjectConfigPanel open={projectSettingsOpen} onClose={() => setProjectSettingsOpen(false)} />
       {section === "project" && <AiCopilot hasBottomNav={isMobile} />}
     </div>

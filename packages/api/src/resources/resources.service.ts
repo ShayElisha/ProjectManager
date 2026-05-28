@@ -38,10 +38,11 @@ export class ResourcesService {
       const weekStart = this.weekStart(slot.date);
       const member = members.find((m) => m.resourceId === slot.resourceId);
       const hoursPerDay = member?.hoursPerDay ?? project.hoursPerDay ?? 8;
+      const ptoBlock = this.db.ptoHoursOnDate(slot.resourceId, slot.date);
       const key = `${slot.resourceId}:${weekStart}`;
       const entry = byResourceWeek.get(key) ?? {
         allocated: 0,
-        available: hoursPerDay * 5,
+        available: Math.max(0, hoursPerDay * 5 - ptoBlock),
       };
       entry.allocated = Math.max(entry.allocated, slot.allocatedHours);
       byResourceWeek.set(key, entry);
@@ -62,6 +63,21 @@ export class ResourcesService {
       });
     }
     return rows.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  }
+
+  listPto(resourceId?: string) {
+    return this.db.getResourcePtos(resourceId);
+  }
+
+  createPto(body: { resourceId: string; startDate: string; endDate: string; label?: string }) {
+    return this.db.createResourcePto(body);
+  }
+
+  matchSkillsForProject(projectId: string, skills: string) {
+    const project = this.db.getProject(projectId);
+    const orgId = project?.organizationId ?? "";
+    const required = skills.split(",").map((s) => s.trim()).filter(Boolean);
+    return this.db.matchResourcesBySkills(orgId, required);
   }
 
   getHistogram(projectId: string, from: string, to: string) {

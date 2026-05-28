@@ -766,6 +766,11 @@
     "about": "About",
     "storageHint": "Without DATABASE_URL, data is stored in memory only.",
     "moreNav": "More screens",
+    "biExport": "BI / Power BI export",
+    "biHint": "Use these URLs in Power BI, Excel, or any BI tool (GET with auth cookie).",
+    "biJson": "JSON snapshot",
+    "biCsv": "CSV for BI",
+    "tasksCsv": "Tasks CSV",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete"
@@ -1147,5 +1152,33 @@
     "savedViewApplied": "Applied «{{name}}»",
     "openHub": "Hub",
     "gridColumns": "Columns"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "command": "Command palette",
+    "search": "Open search",
+    "help": "Show shortcuts",
+    "goDashboard": "Go to dashboard",
+    "goProject": "Go to project",
+    "goReports": "Go to reports",
+    "goBudget": "Go to budget",
+    "newTask": "New task (in project)"
+  },
+  "program": {
+    "group": "Program",
+    "root": "Standalone projects"
+  },
+  "pto": {
+    "title": "PTO / vacation",
+    "pickResource": "Resource",
+    "add": "Add time off"
+  },
+  "skills": {
+    "matchTitle": "Skills matching",
+    "placeholder": "react, pm, design",
+    "search": "Match"
+  },
+  "pwa": {
+    "offlineReady": "App ready for offline use"
   }
 }

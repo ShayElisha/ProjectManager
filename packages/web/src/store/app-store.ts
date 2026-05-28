@@ -628,6 +628,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (name.endsWith(".json")) {
       const { parseProjectJson } = await import("@/lib/project-excel");
       data = parseProjectJson(await file.text());
+    } else if (name.endsWith(".xml")) {
+      const { parseMspXml } = await import("@/lib/project-msp-xml");
+      data = parseMspXml(await file.text(), id);
     } else {
       const { parseProjectExcel } = await import("@/lib/project-excel");
       data = await parseProjectExcel(file, id);

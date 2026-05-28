@@ -337,6 +337,15 @@ export interface Resource {
   costPerUnit?: number;
   maxUnits: number;
   calendarId?: string;
+  skills?: string[];
+}
+
+export interface ResourcePto {
+  id: string;
+  resourceId: string;
+  startDate: string;
+  endDate: string;
+  label?: string;
 }
 
 export interface ResourceAssignment {
@@ -387,7 +396,8 @@ export interface CustomColumn {
   projectId: string;
   key: string;
   label: string;
-  type: "text" | "number" | "date" | "multi_select";
+  type: "text" | "number" | "date" | "multi_select" | "formula";
+  formula?: string;
   options?: string[];
 }
 

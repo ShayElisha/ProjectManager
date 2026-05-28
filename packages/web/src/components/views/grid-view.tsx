@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CustomColumn, Task } from "@nexus/shared";
+import { evaluateCustomFormula } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
 import { TaskDetailDrawer } from "@/components/task-detail-drawer";
 import { api } from "@/lib/api";
@@ -89,6 +90,11 @@ export function GridView() {
   const cellValue = (task: Task, colId: string): string => {
     if (colId.startsWith("custom:")) {
       const key = colId.slice(7);
+      const col = customCols.find((c) => c.key === key);
+      if (col?.type === "formula" && col.formula) {
+        const v = evaluateCustomFormula(col.formula, task.customFields ?? {});
+        return v == null ? "—" : String(v);
+      }
       const v = task.customFields?.[key];
       return v == null ? "—" : String(v);
     }

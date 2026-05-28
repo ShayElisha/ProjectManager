@@ -20,6 +20,11 @@ export class AiController {
     return this.ai.generatePlan(body.prompt ?? "");
   }
 
+  @Get("llm-status")
+  llmStatus() {
+    return { enabled: Boolean(process.env.OPENAI_API_KEY) };
+  }
+
   @Post("projects/:projectId/apply-plan")
   applyPlan(@Param("projectId") projectId: string, @Body() plan: GeneratedPlan) {
     return this.ai.applyPlan(projectId, plan);

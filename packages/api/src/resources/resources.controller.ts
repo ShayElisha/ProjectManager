@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ResourcesService } from "./resources.service";
 
 @Controller("projects/:projectId/resources")
@@ -50,6 +50,26 @@ export class ResourcesController {
       start,
       to ?? end.toISOString().slice(0, 10),
     );
+  }
+
+  @Get("pto")
+  pto(@Query("resourceId") resourceId?: string) {
+    return this.resources.listPto(resourceId);
+  }
+
+  @Post("pto")
+  createPto(
+    @Body() body: { resourceId: string; startDate: string; endDate: string; label?: string },
+  ) {
+    return this.resources.createPto(body);
+  }
+
+  @Get("match-skills")
+  matchSkills(
+    @Param("projectId") projectId: string,
+    @Query("skills") skills: string,
+  ) {
+    return this.resources.matchSkillsForProject(projectId, skills ?? "");
   }
 
   @Get("histogram")

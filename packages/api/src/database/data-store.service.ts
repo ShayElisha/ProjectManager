@@ -1664,6 +1664,34 @@ export class DataStoreService implements OnApplicationBootstrap {
     return Boolean(settings?.emailInboundSecret && settings.emailInboundSecret === secret);
   }
 
+  getResourcePtos(resourceId?: string): import("@nexus/shared").ResourcePto[] {
+    const all = this.mem.resourcePtos;
+    return resourceId ? all.filter((p) => p.resourceId === resourceId) : all;
+  }
+
+  async createResourcePto(
+    input: Omit<import("@nexus/shared").ResourcePto, "id">,
+  ): Promise<import("@nexus/shared").ResourcePto> {
+    const row: import("@nexus/shared").ResourcePto = { ...input, id: uuid() };
+    this.mem.resourcePtos.push(row);
+    return row;
+  }
+
+  matchResourcesBySkills(orgId: string, required: string[]): Resource[] {
+    const need = required.map((s) => s.toLowerCase());
+    return this.getResources(orgId).filter((r) => {
+      const skills = (r.skills ?? []).map((s) => s.toLowerCase());
+      return need.every((n) => skills.some((s) => s.includes(n) || n.includes(s)));
+    });
+  }
+
+  ptoHoursOnDate(resourceId: string, date: string): number {
+    const pto = this.mem.resourcePtos.filter(
+      (p) => p.resourceId === resourceId && p.startDate <= date && p.endDate >= date,
+    );
+    return pto.length > 0 ? 8 : 0;
+  }
+
   async setTasks(projectId: string, tasks: Task[]) {
     this.mem.tasks.set(projectId, tasks);
     const prev = this.taskPersistChains.get(projectId) ?? Promise.resolve();

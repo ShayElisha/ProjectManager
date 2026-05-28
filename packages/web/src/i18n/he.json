@@ -766,6 +766,11 @@
     "about": "אודות",
     "storageHint": "ללא DATABASE_URL הנתונים נשמרים בזיכרון בלבד.",
     "moreNav": "מסכים נוספים",
+    "biExport": "ייצוא BI / Power BI",
+    "biHint": "השתמש ב-URLים האלה ב-Power BI, Excel או כלי BI (GET עם עוגיית auth).",
+    "biJson": "תמונת JSON",
+    "biCsv": "CSV ל-BI",
+    "tasksCsv": "CSV משימות",
     "save": "שמור",
     "cancel": "ביטול",
     "delete": "מחק"
@@ -1147,5 +1152,33 @@
     "savedViewApplied": "הוחלה «{{name}}»",
     "openHub": "מרכז",
     "gridColumns": "עמודות"
+  },
+  "shortcuts": {
+    "title": "קיצורי מקלדת",
+    "command": "פקודות",
+    "search": "חיפוש",
+    "help": "הצג קיצורים",
+    "goDashboard": "לדשבורד",
+    "goProject": "לפרויקט",
+    "goReports": "לדוחות",
+    "goBudget": "לתקציב",
+    "newTask": "משימה חדשה (בפרויקט)"
+  },
+  "program": {
+    "group": "תוכנית",
+    "root": "פרויקטים עצמאיים"
+  },
+  "pto": {
+    "title": "חופשה / PTO",
+    "pickResource": "משאב",
+    "add": "הוסף חופשה"
+  },
+  "skills": {
+    "matchTitle": "התאמת מיומנויות",
+    "placeholder": "react, pm, עיצוב",
+    "search": "חפש"
+  },
+  "pwa": {
+    "offlineReady": "האפליקציה מוכנה לעבודה offline"
   }
 }

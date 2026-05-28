@@ -150,7 +150,13 @@ export class AiService {
     return insights;
   }
 
-  generatePlan(prompt: string): GeneratedPlan {
+  async generatePlan(prompt: string): Promise<GeneratedPlan> {
+    const llm = await this.generatePlanWithLlm(prompt);
+    if (llm) return llm;
+    return this.generatePlanHeuristic(prompt);
+  }
+
+  private generatePlanHeuristic(prompt: string): GeneratedPlan {
     const lower = prompt.toLowerCase();
     const isEcommerce =
       lower.includes("ecommerce") ||
@@ -191,6 +197,43 @@ export class AiService {
         { name: "Closeout", wbs: "4", durationDays: 5, dependencies: [{ predecessorWbs: "3", type: "FS" }] },
       ],
     };
+  }
+
+  private async generatePlanWithLlm(prompt: string): Promise<GeneratedPlan | null> {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key || !prompt.trim()) return null;
+
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+          temperature: 0.3,
+          messages: [
+            {
+              role: "system",
+              content:
+                'Return JSON only: {"tasks":[{"name":"...","wbs":"1","durationDays":5,"parentWbs?":"1","dependencies?":[{"predecessorWbs":"1","type":"FS","lagDays?":0}]}]}',
+            },
+            { role: "user", content: prompt },
+          ],
+        }),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = json.choices?.[0]?.message?.content ?? "";
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+      return JSON.parse(match[0]) as GeneratedPlan;
+    } catch {
+      return null;
+    }
   }
 
   async applyPlan(projectId: string, plan: GeneratedPlan): Promise<Task[]> {

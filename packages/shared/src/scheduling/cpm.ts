@@ -60,6 +60,35 @@ function topologicalSort(nodes: Map<string, GraphNode>): string[] {
   return order;
 }
 
+function applyScheduleConstraint(
+  es: number,
+  ef: number,
+  dur: number,
+  constraint: Task["constraint"],
+  constraintDate: string | undefined,
+): { es: number; ef: number } {
+  if (!constraint || constraint === "ASAP") return { es, ef };
+  const cd = constraintDate ? parseDate(constraintDate) : null;
+  if (cd == null && constraint !== "ALAP") return { es, ef };
+
+  switch (constraint) {
+    case "MSO":
+      return { es: cd!, ef: cd! + dur };
+    case "MFO":
+      return { es: cd! - dur, ef: cd! };
+    case "SNET":
+      return { es: Math.max(es, cd!), ef: Math.max(es, cd!) + dur };
+    case "SNLT":
+      return { es: Math.min(es, cd!), ef: Math.min(es, cd!) + dur };
+    case "FNET":
+      return { es: Math.max(ef, cd!) - dur, ef: Math.max(ef, cd!) };
+    case "FNLT":
+      return { es: Math.min(ef, cd!) - dur, ef: Math.min(ef, cd!) };
+    default:
+      return { es, ef };
+  }
+}
+
 function applyDependency(
   predES: number,
   predEF: number,
@@ -128,8 +157,9 @@ export function calculateCPM(
       const { es: candidateES } = applyDependency(predES, predEF, predDur, dur, p.type, lagMs);
       es = Math.max(es, candidateES);
     }
-    earlyStart.set(id, es);
-    earlyFinish.set(id, es + dur);
+    const constrained = applyScheduleConstraint(es, es + dur, dur, t.constraint, t.constraintDate);
+    earlyStart.set(id, constrained.es);
+    earlyFinish.set(id, constrained.ef);
   }
 
   let projectEndMs = projectStartMs;
@@ -178,8 +208,16 @@ export function calculateCPM(
         lf = Math.min(lf, candidateLF);
       }
     }
+    let ls: number;
+    if (t.constraint === "ALAP" && t.constraintDate) {
+      const cd = parseDate(t.constraintDate);
+      ls = cd;
+      lf = cd + dur;
+    } else {
+      ls = lf - dur;
+    }
     lateFinish.set(id, lf);
-    lateStart.set(id, lf - dur);
+    lateStart.set(id, ls);
   }
 
   const criticalPathIds: string[] = [];
