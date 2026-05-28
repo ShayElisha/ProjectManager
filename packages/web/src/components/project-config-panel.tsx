@@ -11,6 +11,9 @@ import { ProjectDraftForm, defaultProjectDraft } from "@/components/project-draf
 import { MemberCostFields } from "@/components/member-cost-fields";
 import { TeamMemberCostEditor } from "@/components/team-member-cost-editor";
 import { costsFromMode, type MemberCostMode } from "@/lib/member-cost";
+import { api } from "@/lib/api";
+import { useOrgStore } from "@/store/org-store";
+import { ProjectAgileSettings } from "@/components/features/project-agile-settings";
 
 type Tab = "project" | "team" | "schedule" | "links";
 
@@ -34,7 +37,10 @@ export function ProjectConfigPanel({ open, onClose }: Props) {
   const removeDependency = useAppStore((s) => s.removeDependency);
   const addTeamMember = useAppStore((s) => s.addTeamMember);
   const createProject = useAppStore((s) => s.createProject);
+  const loadProjects = useAppStore((s) => s.loadProjects);
   const loadTeam = useAppStore((s) => s.loadTeam);
+  const orgId = useOrgStore((s) => s.activeOrganizationId);
+  const [templates, setTemplates] = useState<Project[]>([]);
 
   const project = activeProject;
   const [tab, setTab] = useState<Tab>("project");
@@ -55,6 +61,11 @@ export function ProjectConfigPanel({ open, onClose }: Props) {
   useEffect(() => {
     if (open && project) void loadTeam();
   }, [open, project, loadTeam]);
+
+  useEffect(() => {
+    if (!open || !orgId) return;
+    void api.projects({ organizationId: orgId, isTemplate: true }).then(setTemplates);
+  }, [open, orgId]);
 
   useEffect(() => {
     if (open && !project) {
@@ -277,6 +288,79 @@ export function ProjectConfigPanel({ open, onClose }: Props) {
                 locale={locale}
                 section="project"
               />
+              <label className="block text-sm">
+                <span className="text-[var(--muted)]">{t("features.parentFolder")}</span>
+                <select
+                  className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
+                  value={draft.parentId ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, parentId: e.target.value || null })
+                  }
+                >
+                  <option value="">{t("features.folderRoot")}</option>
+                  {projects
+                    .filter((p) => p.id !== project.id && !p.isTemplate)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void api.saveAsTemplate(project.id).then(() => void loadProjects())
+                  }
+                >
+                  {t("features.saveAsTemplate")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const name = window.prompt(t("features.duplicateName"), `${project.name} copy`);
+                    if (!name?.trim()) return;
+                    void api
+                      .duplicateProject(project.id, { name: name.trim(), organizationId: orgId ?? undefined })
+                      .then(() => void loadProjects());
+                  }}
+                >
+                  {t("features.duplicateProject")}
+                </Button>
+              </div>
+              <ProjectAgileSettings />
+              {templates.length > 0 && (
+                <div className="rounded-lg border border-[var(--border)] p-3 space-y-2">
+                  <p className="text-xs font-medium text-[var(--muted)]">
+                    {t("features.createFromTemplate")}
+                  </p>
+                  {templates.map((tpl) => (
+                    <Button
+                      key={tpl.id}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() =>
+                        void api
+                          .createFromTemplate(tpl.id, {
+                            name: `${tpl.name} copy`,
+                            organizationId: orgId ?? undefined,
+                            parentId: draft.parentId ?? null,
+                          })
+                          .then(() => void loadProjects())
+                      }
+                    >
+                      {tpl.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
               <div className="mt-6 rounded-xl border border-[var(--border)] p-4">
                 <button
                   type="button"

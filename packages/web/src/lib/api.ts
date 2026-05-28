@@ -30,15 +30,32 @@ import type {
   WhatIfReport,
   ScheduleCurvePoint,
   ProjectForecastReport,
+  Organization,
+  AuthTokens,
+  UserAccount,
+  TaskComment,
+  TaskAttachment,
+  ActiveTimer,
+  SearchHit,
 } from "@nexus/shared";
 import type { AllocationSlot } from "@nexus/shared";
+import { getAccessToken } from "@/lib/auth-token";
 
 const BASE = "/api";
 
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getAccessToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: authHeaders(init?.headers as HeadersInit),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -53,7 +70,35 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  projects: () => fetchJson<Project[]>("/projects"),
+  login: (email: string, password: string) =>
+    fetchJson<AuthTokens>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (name: string, email: string, password: string, organizationId?: string) =>
+    fetchJson<AuthTokens>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password, organizationId }),
+    }),
+  me: () => fetchJson<UserAccount>("/auth/me"),
+
+  organizations: () => fetchJson<Organization[]>("/organizations"),
+  createOrganization: (body: { name: string; defaultLocale?: "he" | "en"; defaultCurrency?: "ILS" | "USD" | "EUR" }) =>
+    fetchJson<Organization>("/organizations", { method: "POST", body: JSON.stringify(body) }),
+
+  search: (q: string, organizationId?: string) =>
+    fetchJson<SearchHit[]>(
+      `/search?q=${encodeURIComponent(q)}${organizationId ? `&organizationId=${organizationId}` : ""}`,
+    ),
+
+  projects: (opts?: { organizationId?: string; parentId?: string | null; isTemplate?: boolean }) => {
+    const params = new URLSearchParams();
+    if (opts?.organizationId) params.set("organizationId", opts.organizationId);
+    if (opts?.parentId !== undefined) params.set("parentId", opts.parentId ?? "null");
+    if (opts?.isTemplate !== undefined) params.set("isTemplate", String(opts.isTemplate));
+    const q = params.toString();
+    return fetchJson<Project[]>(`/projects${q ? `?${q}` : ""}`);
+  },
   project: (id: string) => fetchJson<Project>(`/projects/${id}`),
   createProject: (body: Partial<Project>) =>
     fetchJson<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
@@ -297,8 +342,10 @@ export const api = {
     fetchJson<LevelingSuggestion[]>(
       `/projects/${projectId}/resources/leveling?from=${from}&to=${to}`,
     ),
-  notifications: (projectId: string) =>
-    fetchJson<Notification[]>(`/projects/${projectId}/notifications`),
+  notifications: (projectId: string, userId?: string) => {
+    const q = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return fetchJson<Notification[]>(`/projects/${projectId}/notifications${q}`);
+  },
   timesheets: (projectId: string) =>
     fetchJson<TimesheetEntry[]>(`/projects/${projectId}/timesheets`),
   submitTimesheet: (
@@ -429,6 +476,163 @@ export const api = {
     apiFetch<Task[]>(`/ai/projects/${projectId}/apply-plan`, {
       method: "POST",
       body: JSON.stringify(plan),
+    }),
+
+  createFromTemplate: (
+    templateId: string,
+    body: { name: string; organizationId?: string; parentId?: string | null },
+  ) =>
+    fetchJson<Project>(`/projects/from-template/${templateId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  saveAsTemplate: (projectId: string, name?: string) =>
+    fetchJson<Project>(`/projects/${projectId}/save-as-template`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  taskComments: (projectId: string, taskId: string) =>
+    fetchJson<TaskComment[]>(`/projects/${projectId}/tasks/${taskId}/comments`),
+  addTaskComment: (projectId: string, taskId: string, body: string) =>
+    fetchJson<TaskComment>(`/projects/${projectId}/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
+  taskAttachments: (projectId: string, taskId: string) =>
+    fetchJson<TaskAttachment[]>(`/projects/${projectId}/tasks/${taskId}/attachments`),
+  uploadTaskAttachment: async (projectId: string, taskId: string, file: File) => {
+    const token = getAccessToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/projects/${projectId}/tasks/${taskId}/attachments`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<TaskAttachment>;
+  },
+  deleteTaskAttachment: (projectId: string, taskId: string, attachmentId: string) =>
+    fetchJson<{ deleted: boolean }>(
+      `/projects/${projectId}/tasks/${taskId}/attachments/${attachmentId}`,
+      { method: "DELETE" },
+    ),
+  attachmentDownloadUrl: (attachmentId: string) =>
+    `${BASE}/attachments/${attachmentId}/download`,
+
+  markNotificationRead: (projectId: string, notificationId: string) =>
+    fetchJson<{ ok: boolean }>(`/projects/${projectId}/notifications/${notificationId}/read`, {
+      method: "PATCH",
+    }),
+  markAllNotificationsRead: (projectId: string, userId?: string) =>
+    fetchJson<{ marked: number }>(`/projects/${projectId}/notifications/read-all`, {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    }),
+
+  activeTimer: (projectId: string, userId?: string) => {
+    const q = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return fetchJson<ActiveTimer | null>(`/projects/${projectId}/timer${q}`);
+  },
+  startTimer: (projectId: string, taskId?: string, userId?: string) =>
+    fetchJson<ActiveTimer>(`/projects/${projectId}/timer/start`, {
+      method: "POST",
+      body: JSON.stringify({ taskId, userId }),
+    }),
+  stopTimer: (projectId: string, userId?: string, notes?: string) =>
+    fetchJson<{ ok: boolean; timer?: ActiveTimer; entry?: TimesheetEntry }>(
+      `/projects/${projectId}/timer/stop`,
+      { method: "POST", body: JSON.stringify({ userId, notes }) },
+    ),
+
+  duplicateProject: (projectId: string, body: { name: string; organizationId?: string; parentId?: string | null }) =>
+    fetchJson<Project>(`/projects/${projectId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  moveTask: (projectId: string, taskId: string, targetProjectId: string) =>
+    fetchJson<Task>(`/projects/${projectId}/tasks/${taskId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ targetProjectId }),
+    }),
+
+  customColumns: (projectId: string) =>
+    fetchJson<import("@nexus/shared").CustomColumn[]>(`/projects/${projectId}/custom-columns`),
+  createCustomColumn: (
+    projectId: string,
+    body: { key: string; label: string; type: string; options?: string[] },
+  ) =>
+    fetchJson<import("@nexus/shared").CustomColumn>(`/projects/${projectId}/custom-columns`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  sprints: (projectId: string) =>
+    fetchJson<import("@nexus/shared").Sprint[]>(`/projects/${projectId}/sprints`),
+  createSprint: (
+    projectId: string,
+    body: { name: string; startDate: string; endDate: string; goal?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").Sprint>(`/projects/${projectId}/sprints`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  sprintVelocity: (projectId: string, sprintId: string) =>
+    fetchJson<import("@nexus/shared").SprintVelocity>(
+      `/projects/${projectId}/sprints/${sprintId}/velocity`,
+    ),
+
+  cycles: (projectId: string) =>
+    fetchJson<import("@nexus/shared").Cycle[]>(`/projects/${projectId}/cycles`),
+  createCycle: (
+    projectId: string,
+    body: { name: string; startDate: string; endDate: string },
+  ) =>
+    fetchJson<import("@nexus/shared").Cycle>(`/projects/${projectId}/cycles`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  projectForms: (projectId: string) =>
+    fetchJson<import("@nexus/shared").ProjectForm[]>(`/projects/${projectId}/forms`),
+  createProjectForm: (
+    projectId: string,
+    body: { title: string; slug?: string; fields: import("@nexus/shared").ProjectFormField[] },
+  ) =>
+    fetchJson<import("@nexus/shared").ProjectForm>(`/projects/${projectId}/forms`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  publicForm: (slug: string) => fetchJson<import("@nexus/shared").ProjectForm>(`/public/forms/${slug}`),
+  submitPublicForm: (slug: string, values: Record<string, string>) =>
+    fetchJson<{ ok: boolean; taskId: string }>(`/public/forms/${slug}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ values }),
+    }),
+
+  savedViews: (projectId: string, userId?: string) => {
+    const q = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return fetchJson<import("@nexus/shared").SavedView[]>(`/projects/${projectId}/saved-views${q}`);
+  },
+  createSavedView: (
+    projectId: string,
+    body: { name: string; viewMode: string; filters?: Record<string, unknown>; userId?: string },
+  ) =>
+    fetchJson<import("@nexus/shared").SavedView>(`/projects/${projectId}/saved-views`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  createRecurringTasks: (
+    projectId: string,
+    body: Partial<Task> & { recurrenceRule: import("@nexus/shared").RecurrenceRule },
+  ) =>
+    fetchJson<Task[]>(`/projects/${projectId}/tasks/recurring`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 };
 

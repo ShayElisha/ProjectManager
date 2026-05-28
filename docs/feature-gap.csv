@@ -1,0 +1,63 @@
+id,feature_en,feature_he,level,status,priority,phase_week,effort,notes
+1,Multi-workspace org management,ניהול ארגונים / workspaces מרובים,Basic,done,P2,16-18,L,Organizations API + settings UI
+2,Project templates,תבניות פרויקט,Basic,done,P3,10,S,save-as-template + create from template
+3,Task tags labels,תגיות על משימות,Basic,done,P1,5,S,tags on Task + drawer UI
+4,Task file attachments,קבצים מצורפים למשימה,Basic,done,P1,4,M,Local uploads/ folder + download API
+5,Comment threads on tasks,תגובות / דיון על משימה,Basic,done,P0,3,M,TaskComment API + drawer
+6,Mark notifications as read,סימון התראות כנקראו,Basic,done,P1,3,S,PATCH + read-all + bell UI
+7,Global full-text search,חיפוש גלובלי,Basic,done,P1,6,M,GET /search + command palette
+8,Server authentication JWT session,אימות שרת,Basic,done,P0,1-2,L,JWT auth module; AUTH_DISABLED for dev
+9,Start stop time timer,טיימר start/stop למעקב זמן,Basic,done,P2,8,M,ActiveTimer + timesheets bar
+10,Project folders hierarchy,תיקיות פרויקטים,Standard,done,P3,11,M,parentId on Project + config UI
+11,Duplicate project,שכפול פרויקט,Standard,done,P3,10,S,POST /projects/:id/duplicate
+12,Custom fields,שדות מותאמים אישית,Standard,done,P1,7,L,CustomColumnDef API + settings UI
+13,Rich text task description,תיאור עשיר Rich text,Standard,done,P3,7,M,contenteditable editor in drawer
+14,Move tasks between projects,העברת משימות בין פרויקטים,Standard,done,P3,9,M,POST move + drawer select
+15,Recurring tasks,משימות חוזרות,Standard,done,P3,12,M,recurrenceRule + generate API
+16,Epic Story Bug agile types,Epic Story Bug Agile,Standard,done,P2,13-14,L,issueType on Task + backlog
+17,Sprints scrum board,ספרינטים Scrum board,Standard,done,P2,14-15,L,Sprint + Backlog view
+18,Story points velocity,Story points Velocity,Standard,done,P2,15,M,SP field + velocity endpoint
+19,Cycles product roadmap Linear style,Cycles Roadmap,Standard,done,P3,16,L,Cycle + Roadmap view
+20,Forms to create tasks,טפסים ליצירת משימות,Standard,done,P3,12,M,/f/:slug public form
+21,If-then field automation,אוטומציה If Then,Standard,missing,P2,17,L,Rule engine
+22,Saved views and filters,תצוגות ומסננים שמורים,Standard,missing,P1,6,M,Per user per project
+23,Custom column visibility,עמודות מותאמות בתצוגות,Standard,missing,P2,7,M,With custom fields
+24,URL per view and project,URL לכל תצוגה ופרויקט,Standard,missing,P1,2,M,React Router nested routes
+25,At-mentions,mentions,Standard,missing,P1,3,M,With comments + notifications
+26,Email push notifications,התראות Email Push,Standard,missing,P2,9,L,SendGrid or similar
+27,Activity feed,פיד פעילות,Standard,missing,P2,4,M,Audit-lite from events
+28,Team chat messages,צאט צוות,Standard,missing,P4,20,XL,Out of core PM scope
+29,Integrated wiki docs,Wiki Docs משולב,Standard,missing,P4,20,XL,Notion competitor
+30,External guest sharing,שיתוף guests חיצוניים,Standard,missing,P2,11,L,After RBAC
+31,Custom report builder,בונה דוחות מותאם,Standard,missing,P3,18,L,Fixed reports exist
+32,PDF report export,ייצוא PDF דוחות,Standard,missing,P2,8,M,jsPDF or server PDF
+33,Zapier Make integrations,Zapier Make,Standard,missing,P2,17,M,Webhook triggers
+34,Outbound webhooks,Webhooks יוצאים,Standard,missing,P1,10,M,Event subscriptions
+35,Jira Slack GitHub email integrations,אינטגרציות Jira Slack GitHub,Standard,missing,P3,18-19,XL,Pick one first: Slack
+36,Goals OKR,Goals OKR,Standard,missing,P4,19,L,Separate module
+37,Product roadmap view,Roadmap מוצר,Standard,missing,P3,16,M,Timeline by epic
+38,Integrated docs module,Docs משולבים,Standard,missing,P4,20,XL,
+39,Whiteboard,Whiteboard,Standard,missing,P4,20,XL,
+40,Email to task,Email to task,Standard,missing,P3,10,M,Inbound parse
+41,PWA offline,PWA Offline,Standard,missing,P3,19,L,Service worker + cache
+42,Full keyboard shortcuts,קיצורי מקלדת מלאים,Standard,missing,P3,2,S,Extend command palette
+43,Formula custom fields,נוסחאות בשדות מותאמים,Advanced,missing,P3,7,XL,After custom fields
+44,Full schedule constraints in CPM,אילוצי CPM מלאים,Advanced,partial,P1,5,L,Types exist; wire CPM engine
+45,Microsoft Project mpp import,ייבוא mpp,Advanced,missing,P2,11,XL,Third-party parser
+46,Skills matching for resources,Skills matching משאבים,Advanced,missing,P3,13,M,skills[] on Resource
+47,PTO vacation management,ניהול חופשות PTO,Advanced,missing,P3,13,M,Calendar blocks capacity
+48,Full real-time collaboration,עריכה בזמן אמת מלאה,Advanced,partial,P2,9,L,Socket.io; enable on Vercel
+49,BI connectors Power BI,BI connectors,Advanced,missing,P4,19,L,Export API
+50,LLM-based AI copilot,AI מבוסס LLM,Advanced,partial,P2,15,M,Replace rule-based ai.service
+51,Multi-tenant SaaS workspaces,Multi-tenant,Enterprise,missing,P1,16-18,XL,orgId isolation everywhere
+52,Enforced RBAC roles,RBAC מאוכף,Enterprise,missing,P0,2,L,UserRole types exist
+53,Per-task row permissions,הרשאות per-task,Enterprise,missing,P2,11,XL,After RBAC
+54,SSO SAML Azure AD,SSO,Enterprise,missing,P1,12,L,Auth0 or Passport SAML
+55,Two-factor authentication 2FA,2FA,Enterprise,missing,P2,12,M,TOTP
+56,Audit log,Audit log,Enterprise,missing,P1,4,M,Who changed what when
+57,Full program management,Program management מלא,Enterprise,partial,P3,16,L,Portfolio exists partial
+58,Client invoicing,חיוב לקוח Invoicing,Enterprise,missing,P4,19,XL,Out of PM core
+59,Design proofing approval,Proofing עיצוב,Enterprise,missing,P4,20,XL,Wrike feature
+60,CRM module,CRM,Enterprise,missing,P4,20,XL,
+61,SaaS subscription billing,מנויים Billing SaaS,Enterprise,missing,P4,18,XL,Stripe
+62,Enterprise automation rules,אוטומציה ארגונית,Enterprise,missing,P2,17,L,Admin-defined rules

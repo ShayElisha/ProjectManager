@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { v4 as uuid } from "uuid";
 import {
   calculateCPM,
@@ -22,8 +22,12 @@ import { RealtimeGateway } from "../realtime/realtime.gateway";
 export class TasksService {
   constructor(
     private readonly db: DataStoreService,
-    private readonly realtime: RealtimeGateway,
+    @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
+
+  private emit(projectId: string, event: string, payload: unknown): void {
+    this.realtime?.broadcast(projectId, event, payload);
+  }
 
   findByProject(projectId: string): { tasks: Task[]; dependencies: TaskDependency[] } {
     if (!this.db.getProject(projectId)) {
@@ -44,7 +48,7 @@ export class TasksService {
     const result = calculateCPM(tasks, deps, project.startDate);
     await this.db.setTasks(projectId, result.tasks);
 
-    this.realtime.broadcast(projectId, "schedule:updated", {
+    this.emit(projectId, "schedule:updated", {
       tasks: result.tasks,
       criticalPathIds: result.criticalPathIds,
       projectEnd: result.projectEnd,
@@ -125,7 +129,7 @@ export class TasksService {
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.realtime.broadcast(projectId, "task:updated", updated);
+    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 
@@ -146,13 +150,19 @@ export class TasksService {
     if (subtasks.length > 0) {
       return this.createTaskWithSubtasks(projectId, dto, subtasks);
     }
+    if (dto.recurrenceRule) {
+      const base = this.buildTaskBase(projectId, dto);
+      const created = await this.db.generateRecurringTasks(projectId, base, dto.recurrenceRule);
+      for (const t of created) this.emit(projectId, "task:created", t);
+      return created[0]!;
+    }
     const task = await this.persistTask(projectId, {
       ...dto,
       isSummary: true,
       percentComplete: 0,
       status: "not_started",
     });
-    this.realtime.broadcast(projectId, "task:created", task);
+    this.emit(projectId, "task:created", task);
     return task;
   }
 
@@ -223,13 +233,64 @@ export class TasksService {
         percentComplete: 0,
       });
       children.push(child);
-      this.realtime.broadcast(projectId, "task:created", child);
+      this.emit(projectId, "task:created", child);
     }
 
     await this.rollupParent(projectId, parent.id);
     const refreshed = this.db.getTasks(projectId).find((t) => t.id === parent.id)!;
-    this.realtime.broadcast(projectId, "task:updated", refreshed);
+    this.emit(projectId, "task:updated", refreshed);
     return { parent: refreshed, children };
+  }
+
+  buildTaskBase(projectId: string, dto: Partial<Task>): Omit<Task, "id"> {
+    const tasks = this.db.getTasks(projectId);
+    const maxOrder = tasks.reduce((m, t) => Math.max(m, t.sortOrder), -1);
+    const start = dto.startDate ?? new Date().toISOString().slice(0, 10);
+    const durationDays = dto.durationDays ?? 1;
+    const end = dto.endDate ?? addDays(start, durationDays - 1);
+    const siblings = dto.parentId
+      ? tasks.filter((t) => t.parentId === dto.parentId).length
+      : tasks.filter((t) => !t.parentId).length;
+    return {
+      projectId,
+      parentId: dto.parentId ?? null,
+      wbs:
+        dto.wbs ??
+        (dto.parentId
+          ? `${tasks.find((t) => t.id === dto.parentId)?.wbs}.${siblings + 1}`
+          : String(siblings + 1)),
+      name: dto.name ?? "New Task",
+      status: dto.status ?? "not_started",
+      startDate: start,
+      durationDays,
+      endDate: end,
+      percentComplete: dto.percentComplete ?? 0,
+      isMilestone: dto.isMilestone ?? false,
+      isSummary: dto.isSummary ?? false,
+      manuallyScheduled: dto.manuallyScheduled ?? false,
+      constraint: dto.constraint ?? "ASAP",
+      isCritical: false,
+      assigneeIds: dto.assigneeIds ?? [],
+      sortOrder: maxOrder + 1,
+      isPriority: dto.isPriority ?? false,
+      plannedCost: dto.plannedCost ?? 0,
+      actualCost: 0,
+      tags: dto.tags ?? [],
+      description: dto.description,
+      descriptionHtml: dto.descriptionHtml,
+      issueType: dto.issueType ?? "task",
+      storyPoints: dto.storyPoints,
+      sprintId: dto.sprintId,
+      cycleId: dto.cycleId,
+      customFields: dto.customFields ?? {},
+    };
+  }
+
+  async moveTask(sourceProjectId: string, taskId: string, targetProjectId: string) {
+    const moved = await this.db.moveTaskToProject(sourceProjectId, taskId, targetProjectId);
+    if (!moved) throw new NotFoundException("Task or target project not found");
+    this.emit(targetProjectId, "task:created", moved);
+    return moved;
   }
 
   private async persistTask(projectId: string, dto: Partial<Task>): Promise<Task> {
@@ -285,6 +346,14 @@ export class TasksService {
       isPriority: dto.isPriority ?? false,
       plannedCost: dto.plannedCost ?? 0,
       actualCost: 0,
+      tags: dto.tags ?? [],
+      description: dto.description,
+      descriptionHtml: dto.descriptionHtml,
+      issueType: dto.issueType ?? "task",
+      storyPoints: dto.storyPoints,
+      sprintId: dto.sprintId,
+      cycleId: dto.cycleId,
+      customFields: dto.customFields ?? {},
     };
     await this.db.createTask(projectId, task);
     return task;
@@ -354,7 +423,7 @@ export class TasksService {
       durationDays: existing?.durationDays ?? daysBetween(start, end) + 1,
       isSummary: true,
     });
-    if (parent) this.realtime.broadcast(projectId, "task:updated", parent);
+    if (parent) this.emit(projectId, "task:updated", parent);
   }
 
   async addDependency(
@@ -370,14 +439,14 @@ export class TasksService {
     }
     const dep: TaskDependency = { id: uuid(), projectId, ...dto };
     const created = await this.db.addDependency(dep);
-    this.realtime.broadcast(projectId, "dependency:added", created);
+    this.emit(projectId, "dependency:added", created);
     return created;
   }
 
   async removeDependency(projectId: string, depId: string) {
     const ok = await this.db.removeDependency(projectId, depId);
     if (!ok) throw new NotFoundException(`Dependency ${depId} not found`);
-    this.realtime.broadcast(projectId, "dependency:removed", { id: depId });
+    this.emit(projectId, "dependency:removed", { id: depId });
     return { removed: true };
   }
 
@@ -456,7 +525,7 @@ export class TasksService {
         manuallyScheduled: true,
       });
       if (transferred) {
-        this.realtime.broadcast(projectId, "task:updated", transferred);
+        this.emit(projectId, "task:updated", transferred);
       }
     }
 
@@ -476,7 +545,7 @@ export class TasksService {
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.realtime.broadcast(projectId, "task:updated", updated);
+    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 
@@ -506,7 +575,7 @@ export class TasksService {
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.realtime.broadcast(projectId, "task:updated", updated);
+    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 

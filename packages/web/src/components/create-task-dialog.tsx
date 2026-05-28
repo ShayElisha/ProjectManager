@@ -74,6 +74,8 @@ export function CreateTaskDialog({ open, onClose }: Props) {
   const [isPriority, setIsPriority] = useState(false);
   const [subtasks, setSubtasks] = useState<SubtaskDraft[]>([]);
   const [saving, setSaving] = useState(false);
+  const [recurring, setRecurring] = useState(false);
+  const [recurCount, setRecurCount] = useState(4);
 
   const calendarDays = daysBetween(startDate, endDate) + 1;
 
@@ -85,6 +87,8 @@ export function CreateTaskDialog({ open, onClose }: Props) {
     setWorkDays(defaultWorkDays);
     setIsPriority(false);
     setSubtasks([]);
+    setRecurring(false);
+    setRecurCount(4);
   }, [open, defaultStart, defaultEnd, defaultWorkDays]);
 
   useEffect(() => {
@@ -168,6 +172,9 @@ export function CreateTaskDialog({ open, onClose }: Props) {
         endDate,
         durationDays: workDays,
         isPriority,
+        recurrenceRule: recurring
+          ? { frequency: "weekly", interval: 1, count: recurCount }
+          : undefined,
         subtasks: subtasks
           .filter((s) => s.name.trim())
           .map((s) => ({
@@ -262,6 +269,29 @@ export function CreateTaskDialog({ open, onClose }: Props) {
                 onChange={(e) => setIsPriority(e.target.checked)}
               />
               {t("task.priority")}
+            </label>
+
+            <label className="flex flex-wrap items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={recurring}
+                onChange={(e) => setRecurring(e.target.checked)}
+              />
+              {t("features.recurring")}
+              {recurring && (
+                <>
+                  <span className="text-[var(--muted)]">{t("features.recurWeekly")}</span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={52}
+                    className="w-14 rounded border border-[var(--border)] px-1 py-0.5"
+                    value={recurCount}
+                    onChange={(e) => setRecurCount(Number(e.target.value))}
+                  />
+                  <span className="text-[var(--muted)]">{t("features.recurCount")}</span>
+                </>
+              )}
             </label>
 
             <section className="space-y-3 rounded-xl border border-[var(--border)] p-4">

@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
 import { v4 as uuid } from "uuid";
-import type { TimesheetEntry } from "@nexus/shared";
+import type { TimesheetEntry, UserAccount } from "@nexus/shared";
 import { BudgetService } from "../budget/budget.service";
 import { DataStoreService } from "../database/data-store.service";
 
@@ -89,7 +89,57 @@ export class CollaborationController {
   }
 
   @Get("notifications")
-  notifications() {
-    return this.db.getNotifications();
+  notifications(@Query("userId") userId?: string, @Req() req?: { user?: UserAccount }) {
+    const uid = userId ?? req?.user?.id;
+    return this.db.getNotifications(uid);
+  }
+
+  @Patch("notifications/:id/read")
+  markNotificationRead(@Param("id") id: string) {
+    return this.db.markNotificationRead(id);
+  }
+
+  @Post("notifications/read-all")
+  markAllNotificationsRead(
+    @Body() body: { userId?: string },
+    @Req() req: { user?: UserAccount },
+  ) {
+    const uid = body.userId ?? req.user?.id;
+    return this.db.markAllNotificationsRead(uid);
+  }
+
+  @Get("timer")
+  activeTimer(
+    @Param("projectId") projectId: string,
+    @Req() req: { user?: UserAccount },
+    @Query("userId") userId?: string,
+  ) {
+    const uid = userId ?? req.user?.id ?? "anonymous";
+    return this.db.getActiveTimer(uid, projectId);
+  }
+
+  @Post("timer/start")
+  startTimer(
+    @Param("projectId") projectId: string,
+    @Body() body: { taskId?: string; userId?: string },
+    @Req() req: { user?: UserAccount },
+  ) {
+    const uid = body.userId ?? req.user?.id ?? "anonymous";
+    return this.db.startTimer(uid, projectId, body.taskId);
+  }
+
+  @Post("timer/stop")
+  async stopTimer(
+    @Param("projectId") projectId: string,
+    @Body() body: { userId?: string; notes?: string },
+    @Req() req: { user?: UserAccount },
+  ) {
+    const uid = body.userId ?? req.user?.id ?? "anonymous";
+    const result = await this.db.stopTimer(uid, projectId, body.notes);
+    if (result?.entry) {
+      const overview = await this.budget.recalculate(projectId, false);
+      return { ...result, budget: overview };
+    }
+    return result;
   }
 }

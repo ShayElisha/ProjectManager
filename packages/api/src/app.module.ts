@@ -1,4 +1,8 @@
 import { Module } from "@nestjs/common";
+import { AuthModule } from "./auth/auth.module";
+import { OrganizationsModule } from "./organizations/organizations.module";
+import { SearchModule } from "./search/search.module";
+import { ProjectFeaturesModule } from "./project-features/project-features.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { ResourcesModule } from "./resources/resources.module";
@@ -15,10 +19,16 @@ import { RejectionsModule } from "./rejections/rejections.module";
 import { DatabaseModule } from "./database/database.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
+const realtimeModules = process.env.VERCEL ? [] : [RealtimeModule];
+
 @Module({
   imports: [
     DatabaseModule,
-    RealtimeModule,
+    AuthModule,
+    OrganizationsModule,
+    SearchModule,
+    ProjectFeaturesModule,
+    ...realtimeModules,
     ProjectsModule,
     TasksModule,
     ResourcesModule,

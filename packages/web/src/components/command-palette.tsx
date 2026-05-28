@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Command } from "cmdk";
 import { useAppStore } from "@/store/app-store";
-import { ViewMode } from "@nexus/shared";
+import { ViewMode, type SearchHit } from "@nexus/shared";
+import { api } from "@/lib/api";
+import { useOrgStore } from "@/store/org-store";
 
 export function CommandPalette() {
   const { t } = useTranslation();
@@ -19,7 +21,23 @@ export function CommandPalette() {
   const setSelectedTaskId = useAppStore((s) => s.setSelectedTaskId);
   const setCreateTaskDialogOpen = useAppStore((s) => s.setCreateTaskDialogOpen);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
+  const selectProject = useAppStore((s) => s.selectProject);
   const section = useAppStore((s) => s.section);
+  const orgId = useOrgStore((s) => s.activeOrganizationId);
+  const [query, setQuery] = useState("");
+  const [globalHits, setGlobalHits] = useState<SearchHit[]>([]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setGlobalHits([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void api.search(q, orgId ?? undefined).then(setGlobalHits).catch(() => setGlobalHits([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, orgId]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -35,7 +53,7 @@ export function CommandPalette() {
 
   if (!open) return null;
 
-  const views = ["gantt", "grid", "kanban", "calendar", "timeline"] as ViewMode[];
+  const views = ["gantt", "grid", "kanban", "calendar", "timeline", "backlog", "roadmap"] as ViewMode[];
   const searchableTasks = tasks
     .filter((t) => !t.isSummary)
     .slice(0, 40);
@@ -51,18 +69,45 @@ export function CommandPalette() {
       onClick={() => setOpen(false)}
     >
       <Command
+        shouldFilter={false}
         className="command-palette-panel w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <Command.Input
           placeholder={t("actions.commandPalette") + " (Ctrl+K)"}
+          value={query}
+          onValueChange={setQuery}
           className="w-full border-b border-[var(--border)] bg-transparent px-4 py-3 text-sm outline-none"
         />
         <Command.List className="max-h-80 overflow-auto p-2">
           <Command.Empty className="px-3 py-6 text-center text-sm text-[var(--muted)]">
             —
           </Command.Empty>
-          {activeProjectId && searchableTasks.length > 0 && (
+          {globalHits.length > 0 && (
+            <Command.Group heading={t("features.globalSearch")}>
+              {globalHits.map((hit) => (
+                <Command.Item
+                  key={`${hit.type}-${hit.id}`}
+                  value={`${hit.title} ${hit.subtitle ?? ""}`}
+                  className="cursor-pointer rounded-lg px-3 py-2 text-sm aria-selected:bg-[var(--accent)]/15"
+                  onSelect={() => {
+                    if (hit.type === "project") {
+                      void selectProject(hit.id);
+                    } else if (hit.projectId) {
+                      void selectProject(hit.projectId).then(() => setSelectedTaskId(hit.id));
+                    }
+                    setOpen(false);
+                  }}
+                >
+                  <span className="font-medium">{hit.title}</span>
+                  {hit.subtitle && (
+                    <span className="ms-2 text-xs text-[var(--muted)]">{hit.subtitle}</span>
+                  )}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+          {activeProjectId && searchableTasks.length > 0 && query.length < 2 && (
             <Command.Group heading={t("ux.commandSearchTasks")}>
               {searchableTasks.map((task) => (
                 <Command.Item

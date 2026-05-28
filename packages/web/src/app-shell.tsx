@@ -7,6 +7,8 @@ import {
   Columns3,
   Calendar,
   GitBranch,
+  ListTodo,
+  Map,
   Moon,
   Sun,
   Search,
@@ -34,6 +36,8 @@ import { GridView } from "@/components/views/grid-view";
 import { KanbanView } from "@/components/views/kanban-view";
 import { CalendarView } from "@/components/views/calendar-view";
 import { TimelineView } from "@/components/views/timeline-view";
+import { BacklogView } from "@/components/views/backlog-view";
+import { RoadmapView } from "@/components/views/roadmap-view";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { PortfolioView } from "@/components/views/portfolio-view";
 import { PmoView } from "@/components/views/pmo-view";
@@ -57,6 +61,8 @@ const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   kanban: Columns3,
   calendar: Calendar,
   timeline: GitBranch,
+  backlog: ListTodo,
+  roadmap: Map,
 };
 
 type SideDrawer = "resources" | "evm" | null;
@@ -114,6 +120,8 @@ export default function AppShell() {
     kanban: KanbanView,
     calendar: CalendarView,
     timeline: TimelineView,
+    backlog: BacklogView,
+    roadmap: RoadmapView,
   }[view];
 
   const handleLogout = () => {

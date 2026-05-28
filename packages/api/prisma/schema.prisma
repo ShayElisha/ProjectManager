@@ -15,12 +15,26 @@ model Organization {
   defaultCurrency String     @default("ILS")
   projects        Project[]
   resources       Resource[]
+  users           User[]
+}
+
+model User {
+  id             String        @id @default(uuid()) @map("_id")
+  email          String        @unique
+  passwordHash   String
+  name           String
+  role           String        @default("team_member")
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
 }
 
 model Project {
   id             String               @id @default(uuid()) @map("_id")
   organizationId String
   organization   Organization         @relation(fields: [organizationId], references: [id])
+  parentId       String?
+  isTemplate     Boolean              @default(false)
   name           String
   description    String?
   locale         String               @default("he")
@@ -39,6 +53,11 @@ model Project {
   risks          ProjectRisk[]
   changeRequests ChangeRequest[]
   rejectionLogs  RejectionLog[]
+  customColumns  CustomColumnDef[]
+  sprints        Sprint[]
+  cycles         Cycle[]
+  forms          ProjectForm[]
+  savedViews     SavedView[]
 }
 
 model Task {
@@ -84,6 +103,101 @@ model Task {
   remainingWorkDays   Int?
   pausedAssigneeId    String?
   taskNotes           Json     @default("[]")
+  tags                Json     @default("[]")
+  description         String?
+  descriptionHtml     String?
+  issueType           String   @default("task")
+  storyPoints         Int?
+  sprintId            String?
+  cycleId             String?
+  seriesId            String?
+  recurrenceRule      Json?
+  customFields        Json     @default("{}")
+  comments            TaskComment[]
+  attachments         TaskAttachment[]
+}
+
+model CustomColumnDef {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  key       String
+  label     String
+  type      String
+  options   Json?
+}
+
+model Sprint {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  name      String
+  startDate String
+  endDate   String
+  goal      String?
+  status    String  @default("planned")
+}
+
+model Cycle {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  name      String
+  startDate String
+  endDate   String
+}
+
+model ProjectForm {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  slug      String  @unique
+  title     String
+  enabled   Boolean @default(true)
+  fields    Json
+}
+
+model SavedView {
+  id        String  @id @default(uuid()) @map("_id")
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  userId    String?
+  name      String
+  viewMode  String
+  filters   Json    @default("{}")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid()) @map("_id")
+  projectId String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  userId    String
+  userName  String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid()) @map("_id")
+  projectId   String
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  storagePath String
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+}
+
+model ActiveTimer {
+  id        String    @id @default(uuid()) @map("_id")
+  userId    String
+  projectId String
+  taskId    String?
+  startedAt DateTime
+  stoppedAt DateTime?
 }
 
 model TaskDependency {

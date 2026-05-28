@@ -4,6 +4,7 @@ import type { TimesheetEntry } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { WorkTimerBar } from "@/components/features/work-timer-bar";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<TimesheetEntry["status"], string> = {
@@ -120,6 +121,7 @@ export function TimesheetsView() {
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 overflow-auto pb-4">
       <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-4">
         <h2 className="text-xl font-semibold">{t("timesheets.title")}</h2>
+        <WorkTimerBar />
         <p className="text-xs text-[var(--muted)]">{t("timesheets.actualHint")}</p>
 
         {workerOptions.length === 0 ? (

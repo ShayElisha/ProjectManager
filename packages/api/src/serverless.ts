@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express";
-import serverless from "serverless-http";
 import { createNestApplication } from "./bootstrap";
 
 /** Vercel rewrites /api/* to /api/index; Express may see paths without the /api prefix. */
@@ -17,31 +16,22 @@ function vercelApiPathFix(req: Request, _res: Response, next: NextFunction): voi
   next();
 }
 
-type ServerlessHandler = (
-  req: Parameters<ReturnType<typeof serverless>>[0],
-  res: Parameters<ReturnType<typeof serverless>>[1],
-) => ReturnType<ReturnType<typeof serverless>>;
+type ExpressHandler = (req: Request, res: Response, next?: NextFunction) => unknown;
 
-let cached: ServerlessHandler | null = null;
+let cached: ExpressHandler | null = null;
 
-async function getHandler(): Promise<ServerlessHandler> {
+async function getHandler(): Promise<ExpressHandler> {
   if (cached) return cached;
   const app = await createNestApplication();
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use(vercelApiPathFix);
-  cached = serverless(expressApp, {
-    binary: [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/octet-stream",
-      "image/*",
-    ],
-  });
+  cached = expressApp as ExpressHandler;
   return cached;
 }
 
 export default async function handler(req: unknown, res: unknown) {
   const fn = await getHandler();
-  return fn(req as never, res as never);
+  return fn(req as Request, res as Response);
 }
 
 export const config = {

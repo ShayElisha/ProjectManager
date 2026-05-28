@@ -19,6 +19,8 @@ import type {
 } from "@nexus/shared";
 import { daysBetween } from "@/lib/dependency-anchors";
 import { api } from "@/lib/api";
+import { useOrgStore } from "@/store/org-store";
+import { useAuthStore } from "@/store/auth-store";
 import { tasksAlreadyLinked } from "@/lib/link-rules";
 import { io, Socket } from "socket.io-client";
 import { toast } from "@/lib/toast";
@@ -52,6 +54,7 @@ export interface CreateTaskInput {
   endDate: string;
   durationDays?: number;
   isPriority?: boolean;
+  recurrenceRule?: import("@nexus/shared").RecurrenceRule;
   subtasks?: Array<{
     name: string;
     startDate: string;
@@ -226,7 +229,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadProjects: async () => {
     set({ loading: true });
     try {
-      const projects = await api.projects();
+      const orgId = useOrgStore.getState().activeOrganizationId ?? undefined;
+      const projects = await api.projects({
+        organizationId: orgId,
+        isTemplate: false,
+      });
       if (projects.length === 0) {
         set({
           projects: [],
@@ -272,12 +279,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...(keepSection ? {} : { section: "project" as AppSection }),
     });
     try {
+      const userId = useAuthStore.getState().user?.id;
       const [project, { tasks, dependencies }, baselines, notifications, team] =
         await Promise.all([
           api.project(id),
           api.tasks(id),
           api.baselines(id),
-          api.notifications(id),
+          api.notifications(id, userId),
           api.team(id),
         ]);
       const resourceNames = Object.fromEntries(team.resources.map((r) => [r.id, r.name]));
@@ -308,8 +316,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createProject: async (input) => {
     try {
+      const orgId = useOrgStore.getState().activeOrganizationId ?? undefined;
       const project = await api.createProject({
         ...input,
+        organizationId: input.organizationId ?? orgId,
         locale: input.locale ?? get().locale,
         startDate: input.startDate ?? new Date().toISOString().slice(0, 10),
       });
@@ -542,7 +552,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   createTask: async (input) => {
     const id = get().activeProjectId;
     if (!id) return;
-    const result = await api.createTask(id, {
+    const payload = {
       name: input.name,
       startDate: input.startDate,
       endDate: input.endDate,
@@ -550,7 +560,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         input.durationDays ?? daysBetween(input.startDate, input.endDate) + 1,
       isPriority: input.isPriority ?? false,
       subtasks: input.subtasks,
-    });
+      recurrenceRule: input.recurrenceRule,
+    };
+    if (input.recurrenceRule && !input.subtasks?.length) {
+      const created = await api.createRecurringTasks(id, {
+        ...payload,
+        recurrenceRule: input.recurrenceRule,
+      });
+      set((s) => ({ tasks: [...s.tasks, ...created] }));
+      toast.success("toast.taskCreated");
+      return;
+    }
+    const result = await api.createTask(id, payload);
     if (result && typeof result === "object" && "parent" in result && "children" in result) {
       set((s) => ({
         tasks: [...s.tasks, result.parent, ...result.children],

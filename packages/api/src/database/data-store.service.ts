@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { v4 as uuid } from "uuid";
 import type {
+  Organization,
   Project,
   Task,
   TaskDependency,
@@ -15,16 +16,51 @@ import type {
   ChangeRequest,
   ManualRejectionEntry,
   ManualRejectionCategory,
+  TaskComment,
+  TaskAttachment,
+  ActiveTimer,
+  UserAccount,
+  UserRole,
+  CustomColumn,
+  Sprint,
+  Cycle,
+  ProjectForm,
+  SavedView,
+  RecurrenceRule,
+  SprintVelocity,
 } from "@nexus/shared";
+import type { StoredUserRecord } from "./in-memory.backend";
 import { riskScore as calcRiskScore } from "@nexus/shared";
 import { PrismaService } from "./prisma.service";
 import { InMemoryBackend } from "./in-memory.backend";
 import { buildSeedData } from "./seed-data";
 
+const DB_BOOTSTRAP_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function prismaProjectData(p: Project) {
   return {
     id: p.id,
     organizationId: p.organizationId,
+    parentId: p.parentId ?? null,
+    isTemplate: p.isTemplate ?? false,
     name: p.name,
     description: p.description ?? null,
     locale: p.locale,
@@ -80,9 +116,29 @@ function mapTask(t: {
   remainingWorkDays?: number | null;
   pausedAssigneeId?: string | null;
   taskNotes?: unknown;
+  tags?: unknown;
+  description?: string | null;
+  descriptionHtml?: string | null;
+  issueType?: string | null;
+  storyPoints?: number | null;
+  sprintId?: string | null;
+  cycleId?: string | null;
+  seriesId?: string | null;
+  recurrenceRule?: unknown;
+  customFields?: unknown;
 }): Task {
   return {
     ...t,
+    tags: (t.tags as string[] | undefined) ?? [],
+    description: t.description ?? undefined,
+    descriptionHtml: t.descriptionHtml ?? undefined,
+    issueType: (t.issueType as Task["issueType"]) ?? "task",
+    storyPoints: t.storyPoints ?? undefined,
+    sprintId: t.sprintId ?? undefined,
+    cycleId: t.cycleId ?? undefined,
+    seriesId: t.seriesId ?? undefined,
+    recurrenceRule: (t.recurrenceRule as RecurrenceRule | undefined) ?? undefined,
+    customFields: (t.customFields as Task["customFields"]) ?? {},
     taskNotes: (t.taskNotes as string[] | undefined) ?? undefined,
     parentId: t.parentId,
     isPriority: t.isPriority ?? false,
@@ -158,6 +214,16 @@ function taskToPrismaCreate(task: Task) {
     remainingWorkDays: task.remainingWorkDays ?? null,
     pausedAssigneeId: task.pausedAssigneeId ?? null,
     taskNotes: task.taskNotes ?? [],
+    tags: task.tags ?? [],
+    description: task.description ?? null,
+    descriptionHtml: task.descriptionHtml ?? null,
+    issueType: task.issueType ?? "task",
+    storyPoints: task.storyPoints ?? null,
+    sprintId: task.sprintId ?? null,
+    cycleId: task.cycleId ?? null,
+    seriesId: task.seriesId ?? null,
+    recurrenceRule: (task.recurrenceRule ?? undefined) as object | undefined,
+    customFields: (task.customFields ?? {}) as object,
   };
 }
 
@@ -218,19 +284,26 @@ export class DataStoreService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
+    if (process.env.VERCEL) this.logger.warn("DataStore bootstrap:start");
     if (!this.useDb) {
       this.mem.seed();
-      this.logger.log("DataStore: in-memory mode (set DATABASE_URL to persist data)");
+      this.logger.warn("DataStore bootstrap:in-memory mode");
       return;
     }
 
     try {
-      const count = await this.prisma.project.count();
-      if (count === 0) {
-        await this.seedDatabase();
-        this.logger.log("DataStore: empty organization ready (no demo projects)");
-      }
-      await this.hydrateFromDatabase();
+      await withTimeout(
+        (async () => {
+          const count = await this.prisma.project.count();
+          if (count === 0) {
+            await this.seedDatabase();
+            this.logger.log("DataStore: empty organization ready (no demo projects)");
+          }
+          await this.hydrateFromDatabase();
+        })(),
+        DB_BOOTSTRAP_TIMEOUT_MS,
+        "DataStore bootstrap",
+      );
       this.logger.log("DataStore: database connected, cache hydrated");
     } catch (err) {
       this.logger.warn(
@@ -238,6 +311,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       );
       this.mem.seed();
     }
+    if (process.env.VERCEL) this.logger.warn("DataStore bootstrap:done");
   }
 
   private async seedDatabase() {
@@ -275,8 +349,18 @@ export class DataStoreService implements OnApplicationBootstrap {
   }
 
   private async hydrateFromDatabase() {
-    const org = await this.prisma.organization.findFirst();
+    const orgs = await this.prisma.organization.findMany();
+    const org = orgs[0];
     if (!org) return;
+
+    for (const o of orgs) {
+      this.mem.organizations.set(o.id, {
+        id: o.id,
+        name: o.name,
+        defaultLocale: o.defaultLocale as Organization["defaultLocale"],
+        defaultCurrency: o.defaultCurrency as Organization["defaultCurrency"],
+      });
+    }
 
     const data = buildSeedData();
     data.organizationId = org.id;
@@ -300,6 +384,8 @@ export class DataStoreService implements OnApplicationBootstrap {
       data.projects.push({
         id: p.id,
         organizationId: p.organizationId,
+        parentId: p.parentId ?? null,
+        isTemplate: p.isTemplate ?? false,
         name: p.name,
         description: p.description ?? undefined,
         locale: p.locale as Project["locale"],
@@ -517,8 +603,609 @@ export class DataStoreService implements OnApplicationBootstrap {
     return this.mem.timesheets.filter((e) => taskIds.has(e.taskId));
   }
 
-  getNotifications() {
-    return this.mem.notifications;
+  getNotifications(userId?: string) {
+    const list = this.mem.notifications;
+    if (!userId) return list;
+    return list.filter((n) => n.userId === userId);
+  }
+
+  getOrganizations(): Organization[] {
+    if (this.mem.organizations.size === 0 && this.mem.organizationId) {
+      this.mem.organizations.set(this.mem.organizationId, {
+        id: this.mem.organizationId,
+        name: this.mem.organizationName,
+        defaultLocale: "he",
+        defaultCurrency: "ILS",
+      });
+    }
+    return Array.from(this.mem.organizations.values());
+  }
+
+  getOrganization(id: string) {
+    return this.mem.organizations.get(id);
+  }
+
+  async createOrganization(dto: {
+    name: string;
+    defaultLocale?: Organization["defaultLocale"];
+    defaultCurrency?: Organization["defaultCurrency"];
+  }): Promise<Organization> {
+    const org: Organization = {
+      id: uuid(),
+      name: dto.name,
+      defaultLocale: dto.defaultLocale ?? "he",
+      defaultCurrency: dto.defaultCurrency ?? "ILS",
+    };
+    this.mem.organizations.set(org.id, org);
+    if (this.useDb) {
+      await this.prisma.organization.create({
+        data: {
+          id: org.id,
+          name: org.name,
+          defaultLocale: org.defaultLocale,
+          defaultCurrency: org.defaultCurrency,
+        },
+      });
+    }
+    return org;
+  }
+
+  updateOrganization(
+    id: string,
+    patch: Partial<Pick<Organization, "name" | "defaultLocale" | "defaultCurrency">>,
+  ): Organization | null {
+    const org = this.mem.organizations.get(id);
+    if (!org) return null;
+    const updated = { ...org, ...patch };
+    this.mem.organizations.set(id, updated);
+    if (id === this.mem.organizationId) this.mem.organizationName = updated.name;
+    if (this.useDb) {
+      void this.prisma.organization.update({
+        where: { id },
+        data: {
+          ...(patch.name != null ? { name: patch.name } : {}),
+          ...(patch.defaultLocale != null ? { defaultLocale: patch.defaultLocale } : {}),
+          ...(patch.defaultCurrency != null ? { defaultCurrency: patch.defaultCurrency } : {}),
+        },
+      });
+    }
+    return updated;
+  }
+
+  async ensureDefaultOrganizationId(): Promise<string> {
+    return this.ensureOrganization();
+  }
+
+  getUserByEmail(email: string): UserAccount | undefined {
+    const id = this.mem.usersByEmail.get(email.trim().toLowerCase());
+    if (!id) return undefined;
+    const u = this.mem.users.get(id);
+    if (!u) return undefined;
+    const { passwordHash: _p, ...account } = u;
+    return account;
+  }
+
+  getUserById(id: string): UserAccount | undefined {
+    const u = this.mem.users.get(id);
+    if (!u) return undefined;
+    const { passwordHash: _p, ...account } = u;
+    return account;
+  }
+
+  getUserRecord(id: string): StoredUserRecord | undefined {
+    return this.mem.users.get(id);
+  }
+
+  async createUser(input: {
+    email: string;
+    name: string;
+    passwordHash: string;
+    role: UserRole;
+    organizationId?: string;
+  }): Promise<UserAccount> {
+    const id = uuid();
+    const record: StoredUserRecord = {
+      id,
+      email: input.email,
+      name: input.name,
+      role: input.role,
+      organizationId: input.organizationId,
+      passwordHash: input.passwordHash,
+    };
+    this.mem.users.set(id, record);
+    this.mem.usersByEmail.set(input.email, id);
+    if (this.useDb) {
+      await this.prisma.user.create({
+        data: {
+          id,
+          email: input.email,
+          name: input.name,
+          passwordHash: input.passwordHash,
+          role: input.role,
+          organizationId: input.organizationId ?? null,
+        },
+      });
+    }
+    const { passwordHash: _p, ...account } = record;
+    return account;
+  }
+
+  getTaskComments(projectId: string, taskId: string): TaskComment[] {
+    return this.mem.taskComments
+      .filter((c) => c.projectId === projectId && c.taskId === taskId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async addTaskComment(input: {
+    projectId: string;
+    taskId: string;
+    userId: string;
+    userName: string;
+    body: string;
+  }): Promise<TaskComment> {
+    const comment: TaskComment = {
+      id: uuid(),
+      projectId: input.projectId,
+      taskId: input.taskId,
+      userId: input.userId,
+      userName: input.userName,
+      body: input.body,
+      createdAt: new Date().toISOString(),
+    };
+    this.mem.taskComments.push(comment);
+    if (this.useDb) {
+      await this.prisma.taskComment.create({ data: { ...comment, createdAt: new Date(comment.createdAt) } });
+    }
+    return comment;
+  }
+
+  getTaskAttachments(projectId: string, taskId: string): TaskAttachment[] {
+    return this.mem.taskAttachments
+      .filter((a) => a.projectId === projectId && a.taskId === taskId)
+      .map(({ storagePath: _s, ...rest }) => rest);
+  }
+
+  getAttachmentById(id: string): TaskAttachment | undefined {
+    return this.mem.taskAttachments.find((a) => a.id === id);
+  }
+
+  async addTaskAttachment(input: {
+    projectId: string;
+    taskId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    storagePath: string;
+    uploadedBy?: string;
+  }): Promise<TaskAttachment> {
+    const att: TaskAttachment = {
+      id: uuid(),
+      projectId: input.projectId,
+      taskId: input.taskId,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      storagePath: input.storagePath,
+      uploadedBy: input.uploadedBy,
+      createdAt: new Date().toISOString(),
+    };
+    this.mem.taskAttachments.push(att);
+    if (this.useDb) {
+      await this.prisma.taskAttachment.create({
+        data: {
+          id: att.id,
+          projectId: att.projectId,
+          taskId: att.taskId,
+          fileName: att.fileName,
+          mimeType: att.mimeType,
+          sizeBytes: att.sizeBytes,
+          storagePath: att.storagePath!,
+          uploadedBy: att.uploadedBy ?? null,
+          createdAt: new Date(att.createdAt),
+        },
+      });
+    }
+    const { storagePath: _s, ...pub } = att;
+    return pub;
+  }
+
+  deleteTaskAttachment(projectId: string, taskId: string, attachmentId: string) {
+    const idx = this.mem.taskAttachments.findIndex(
+      (a) => a.id === attachmentId && a.projectId === projectId && a.taskId === taskId,
+    );
+    if (idx < 0) return { deleted: false };
+    this.mem.taskAttachments.splice(idx, 1);
+    if (this.useDb) {
+      void this.prisma.taskAttachment.delete({ where: { id: attachmentId } });
+    }
+    return { deleted: true };
+  }
+
+  markNotificationRead(id: string) {
+    const n = this.mem.notifications.find((x) => x.id === id);
+    if (!n) return { ok: false };
+    n.read = true;
+    if (this.useDb) {
+      void this.prisma.notification.update({ where: { id }, data: { read: true } });
+    }
+    return { ok: true, notification: n };
+  }
+
+  markAllNotificationsRead(userId?: string) {
+    let count = 0;
+    for (const n of this.mem.notifications) {
+      if (userId && n.userId !== userId) continue;
+      if (!n.read) {
+        n.read = true;
+        count++;
+      }
+    }
+    if (this.useDb && userId) {
+      void this.prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
+    }
+    return { marked: count };
+  }
+
+  getActiveTimer(userId: string, projectId: string): ActiveTimer | null {
+    return (
+      this.mem.activeTimers.find(
+        (t) => t.userId === userId && t.projectId === projectId && !t.stoppedAt,
+      ) ?? null
+    );
+  }
+
+  startTimer(userId: string, projectId: string, taskId?: string): ActiveTimer {
+    const existing = this.getActiveTimer(userId, projectId);
+    if (existing) return existing;
+    const timer: ActiveTimer = {
+      id: uuid(),
+      userId,
+      projectId,
+      taskId,
+      startedAt: new Date().toISOString(),
+    };
+    this.mem.activeTimers.push(timer);
+    if (this.useDb) {
+      void this.prisma.activeTimer.create({
+        data: {
+          id: timer.id,
+          userId,
+          projectId,
+          taskId: taskId ?? null,
+          startedAt: new Date(timer.startedAt),
+        },
+      });
+    }
+    return timer;
+  }
+
+  async stopTimer(userId: string, projectId: string, notes?: string) {
+    const timer = this.getActiveTimer(userId, projectId);
+    if (!timer) return { ok: false as const };
+    timer.stoppedAt = new Date().toISOString();
+    const started = new Date(timer.startedAt).getTime();
+    const ended = new Date(timer.stoppedAt).getTime();
+    const hours = Math.round(((ended - started) / 3600000) * 100) / 100;
+    const date = timer.startedAt.slice(0, 10);
+    const entry: TimesheetEntry = {
+      id: uuid(),
+      projectId,
+      userId,
+      taskId: timer.taskId ?? this.getTasks(projectId)[0]?.id ?? "",
+      date,
+      hours: Math.max(0.25, hours),
+      status: "draft",
+      notes: notes ?? "Timer",
+    };
+    if (entry.taskId) await this.addTimesheet(entry);
+    if (this.useDb) {
+      void this.prisma.activeTimer.update({
+        where: { id: timer.id },
+        data: { stoppedAt: new Date(timer.stoppedAt) },
+      });
+    }
+    return { ok: true as const, timer, entry: entry.taskId ? entry : undefined };
+  }
+
+  async cloneProjectFromTemplate(
+    templateId: string,
+    opts: { name: string; organizationId?: string; parentId?: string | null },
+  ): Promise<Project | null> {
+    return this.cloneProject(templateId, opts, true);
+  }
+
+  async duplicateProject(
+    projectId: string,
+    opts: { name: string; organizationId?: string; parentId?: string | null },
+  ): Promise<Project | null> {
+    return this.cloneProject(projectId, opts, false);
+  }
+
+  private async cloneProject(
+    sourceId: string,
+    opts: { name: string; organizationId?: string; parentId?: string | null },
+    requireTemplate: boolean,
+  ): Promise<Project | null> {
+    const source = this.mem.projects.get(sourceId);
+    if (!source) return null;
+    if (requireTemplate && !source.isTemplate) return null;
+
+    const created = await this.createProject({
+      name: opts.name,
+      organizationId: opts.organizationId ?? source.organizationId,
+      parentId: opts.parentId ?? null,
+      isTemplate: false,
+      locale: source.locale,
+      currency: source.currency,
+      startDate: source.startDate,
+      endDate: source.endDate,
+      status: "planning",
+      budgetCap: source.budgetCap,
+      hoursPerDay: source.hoursPerDay,
+      workDays: source.workDays,
+      defaultLinkType: source.defaultLinkType,
+    });
+
+    const srcTasks = this.getTasks(sourceId);
+    const idMap = new Map<string, string>();
+    for (const t of srcTasks) idMap.set(t.id, uuid());
+
+    const cloned = srcTasks.map((t) => ({
+      ...t,
+      id: idMap.get(t.id)!,
+      projectId: created.id,
+      parentId: t.parentId ? (idMap.get(t.parentId) ?? null) : null,
+      sprintId: undefined,
+      seriesId: undefined,
+    }));
+    if (cloned.length) await this.bulkCreateTasks(created.id, cloned);
+
+    for (const d of this.getDependencies(sourceId)) {
+      const pred = idMap.get(d.predecessorId);
+      const succ = idMap.get(d.successorId);
+      if (pred && succ) {
+        await this.addDependency({
+          ...d,
+          id: uuid(),
+          projectId: created.id,
+          predecessorId: pred,
+          successorId: succ,
+        });
+      }
+    }
+
+    for (const m of this.getProjectMembers(sourceId)) {
+      await this.addProjectMember({
+        ...m,
+        id: uuid(),
+        projectId: created.id,
+      });
+    }
+
+    for (const col of this.getCustomColumns(sourceId)) {
+      await this.createCustomColumn({ ...col, id: uuid(), projectId: created.id });
+    }
+
+    return created;
+  }
+
+  async moveTaskToProject(
+    sourceProjectId: string,
+    taskId: string,
+    targetProjectId: string,
+  ): Promise<Task | null> {
+    const tasks = this.mem.tasks.get(sourceProjectId) ?? [];
+    const idx = tasks.findIndex((t) => t.id === taskId);
+    if (idx < 0) return null;
+
+    const targetProject = this.mem.projects.get(targetProjectId);
+    if (!targetProject) return null;
+
+    const task = { ...tasks[idx]! };
+    const toMoveIds = new Set<string>();
+    const collect = (id: string) => {
+      toMoveIds.add(id);
+      for (const c of tasks.filter((t) => t.parentId === id)) collect(c.id);
+    };
+    collect(taskId);
+
+    const moving = tasks.filter((t) => toMoveIds.has(t.id));
+    const remaining = tasks.filter((t) => !toMoveIds.has(t.id));
+    this.mem.tasks.set(sourceProjectId, remaining);
+
+    const targetOrgResources = this.getResources(targetProject.organizationId);
+    const resourceIds = new Set(targetOrgResources.map((r) => r.id));
+
+    const idMap = new Map<string, string>();
+    for (const t of moving) idMap.set(t.id, uuid());
+
+    const remapped = moving.map((t) => ({
+      ...t,
+      id: idMap.get(t.id)!,
+      projectId: targetProjectId,
+      parentId: t.parentId ? (idMap.get(t.parentId) ?? null) : null,
+      assigneeIds: t.assigneeIds.filter((id) => resourceIds.has(id)),
+      sprintId: undefined,
+      cycleId: undefined,
+    }));
+
+    const targetTasks = [...(this.mem.tasks.get(targetProjectId) ?? []), ...remapped];
+    await this.setTasks(targetProjectId, targetTasks);
+
+    if (this.useDb) {
+      await this.prisma.task.deleteMany({
+        where: { id: { in: [...toMoveIds] }, projectId: sourceProjectId },
+      });
+    }
+
+    return remapped.find((t) => t.id === idMap.get(taskId)) ?? null;
+  }
+
+  getCustomColumns(projectId: string): CustomColumn[] {
+    return this.mem.customColumns.get(projectId) ?? [];
+  }
+
+  async createCustomColumn(input: Omit<CustomColumn, "id"> & { id?: string }): Promise<CustomColumn> {
+    const col: CustomColumn = { ...input, id: input.id ?? uuid() };
+    const list = this.mem.customColumns.get(col.projectId) ?? [];
+    list.push(col);
+    this.mem.customColumns.set(col.projectId, list);
+    if (this.useDb) {
+      await this.prisma.customColumnDef.create({
+        data: {
+          id: col.id,
+          projectId: col.projectId,
+          key: col.key,
+          label: col.label,
+          type: col.type,
+          options: col.options ?? undefined,
+        },
+      });
+    }
+    return col;
+  }
+
+  getSprints(projectId: string): Sprint[] {
+    return this.mem.sprints.get(projectId) ?? [];
+  }
+
+  async createSprint(input: Omit<Sprint, "id"> & { id?: string }): Promise<Sprint> {
+    const sprint: Sprint = { ...input, id: input.id ?? uuid() };
+    const list = this.mem.sprints.get(sprint.projectId) ?? [];
+    list.push(sprint);
+    this.mem.sprints.set(sprint.projectId, list);
+    if (this.useDb) {
+      await this.prisma.sprint.create({ data: sprint });
+    }
+    return sprint;
+  }
+
+  async updateSprint(projectId: string, sprintId: string, patch: Partial<Sprint>): Promise<Sprint | null> {
+    const list = this.mem.sprints.get(projectId) ?? [];
+    const idx = list.findIndex((s) => s.id === sprintId);
+    if (idx < 0) return null;
+    list[idx] = { ...list[idx]!, ...patch };
+    if (this.useDb) {
+      await this.prisma.sprint.update({ where: { id: sprintId }, data: patch });
+    }
+    return list[idx]!;
+  }
+
+  getSprintVelocity(projectId: string, sprintId: string): SprintVelocity | null {
+    const sprint = this.getSprints(projectId).find((s) => s.id === sprintId);
+    if (!sprint) return null;
+    const tasks = this.getTasks(projectId).filter((t) => t.sprintId === sprintId);
+    const points = (t: Task) => t.storyPoints ?? 0;
+    return {
+      sprintId,
+      sprintName: sprint.name,
+      committedPoints: tasks.reduce((s, t) => s + points(t), 0),
+      completedPoints: tasks
+        .filter((t) => t.status === "completed")
+        .reduce((s, t) => s + points(t), 0),
+    };
+  }
+
+  getCycles(projectId: string): Cycle[] {
+    return this.mem.cycles.get(projectId) ?? [];
+  }
+
+  async createCycle(input: Omit<Cycle, "id"> & { id?: string }): Promise<Cycle> {
+    const cycle: Cycle = { ...input, id: input.id ?? uuid() };
+    const list = this.mem.cycles.get(cycle.projectId) ?? [];
+    list.push(cycle);
+    this.mem.cycles.set(cycle.projectId, list);
+    if (this.useDb) {
+      await this.prisma.cycle.create({ data: cycle });
+    }
+    return cycle;
+  }
+
+  getProjectForms(projectId: string): ProjectForm[] {
+    return this.mem.projectForms.get(projectId) ?? [];
+  }
+
+  getFormBySlug(slug: string): ProjectForm | undefined {
+    for (const forms of this.mem.projectForms.values()) {
+      const f = forms.find((x) => x.slug === slug && x.enabled);
+      if (f) return f;
+    }
+    return undefined;
+  }
+
+  async createProjectForm(input: Omit<ProjectForm, "id"> & { id?: string }): Promise<ProjectForm> {
+    const form: ProjectForm = { ...input, id: input.id ?? uuid() };
+    const list = this.mem.projectForms.get(form.projectId) ?? [];
+    list.push(form);
+    this.mem.projectForms.set(form.projectId, list);
+    if (this.useDb) {
+      await this.prisma.projectForm.create({
+        data: { ...form, fields: form.fields as object },
+      });
+    }
+    return form;
+  }
+
+  getSavedViews(projectId: string, userId?: string): SavedView[] {
+    const list = this.mem.savedViews.get(projectId) ?? [];
+    if (!userId) return list;
+    return list.filter((v) => !v.userId || v.userId === userId);
+  }
+
+  async createSavedView(input: Omit<SavedView, "id"> & { id?: string }): Promise<SavedView> {
+    const view: SavedView = { ...input, id: input.id ?? uuid() };
+    const list = this.mem.savedViews.get(view.projectId) ?? [];
+    list.push(view);
+    this.mem.savedViews.set(view.projectId, list);
+    if (this.useDb) {
+      await this.prisma.savedView.create({
+        data: { ...view, filters: view.filters as object },
+      });
+    }
+    return view;
+  }
+
+  async generateRecurringTasks(
+    projectId: string,
+    base: Omit<Task, "id">,
+    rule: RecurrenceRule,
+  ): Promise<Task[]> {
+    const seriesId = uuid();
+    const count = Math.min(rule.count ?? 12, 52);
+    const created: Task[] = [];
+    let start = new Date(base.startDate);
+    let end = new Date(base.endDate);
+    const durationMs = end.getTime() - start.getTime();
+
+    for (let i = 0; i < count; i++) {
+      if (i > 0) {
+        if (rule.frequency === "daily") {
+          start.setDate(start.getDate() + rule.interval);
+          end = new Date(start.getTime() + durationMs);
+        } else if (rule.frequency === "weekly") {
+          start.setDate(start.getDate() + 7 * rule.interval);
+          end = new Date(start.getTime() + durationMs);
+        } else {
+          start.setMonth(start.getMonth() + rule.interval);
+          end = new Date(start.getTime() + durationMs);
+        }
+        if (rule.until && start.toISOString().slice(0, 10) > rule.until) break;
+      }
+      const task: Task = {
+        ...base,
+        id: uuid(),
+        projectId,
+        seriesId,
+        recurrenceRule: i === 0 ? rule : undefined,
+        name: count > 1 ? `${base.name} #${i + 1}` : base.name,
+        startDate: start.toISOString().slice(0, 10),
+        endDate: end.toISOString().slice(0, 10),
+        sortOrder: base.sortOrder + i,
+      };
+      await this.createTask(projectId, task);
+      created.push(task);
+    }
+    return created;
   }
 
   getBudgetLines(projectId: string): BudgetLineItem[] {
@@ -572,6 +1259,8 @@ export class DataStoreService implements OnApplicationBootstrap {
     const project: Project = {
       id: uuid(),
       organizationId: dto.organizationId ?? orgId,
+      parentId: dto.parentId ?? null,
+      isTemplate: dto.isTemplate ?? false,
       name: dto.name ?? "New Project",
       description: dto.description,
       locale: dto.locale ?? "he",
@@ -596,6 +1285,11 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.risks.set(project.id, []);
     this.mem.changeRequests.set(project.id, []);
     this.mem.rejectionLogs.set(project.id, []);
+    this.mem.customColumns.set(project.id, []);
+    this.mem.sprints.set(project.id, []);
+    this.mem.cycles.set(project.id, []);
+    this.mem.projectForms.set(project.id, []);
+    this.mem.savedViews.set(project.id, []);
 
     if (this.useDb) {
       await this.prisma.project.create({ data: prismaProjectData(project) });
@@ -646,6 +1340,8 @@ export class DataStoreService implements OnApplicationBootstrap {
           endDate: updated.endDate,
           status: updated.status,
           budgetCap: updated.budgetCap ?? null,
+          parentId: updated.parentId ?? null,
+          isTemplate: updated.isTemplate ?? false,
           updatedAt: new Date(updated.updatedAt),
         },
       });

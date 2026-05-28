@@ -20,7 +20,77 @@ export type BudgetCategory = "labor" | "material" | "equipment" | "subcontractor
 /** How actual/planned labor on a task is derived */
 export type LaborCostSource = "auto" | "manual" | "timesheet";
 export type TaskStatus = "not_started" | "in_progress" | "completed" | "on_hold";
-export type ViewMode = "gantt" | "grid" | "kanban" | "calendar" | "timeline";
+export type ViewMode =
+  | "gantt"
+  | "grid"
+  | "kanban"
+  | "calendar"
+  | "timeline"
+  | "backlog"
+  | "roadmap";
+
+export type IssueType = "epic" | "story" | "task" | "bug";
+
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly";
+
+export interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  count?: number;
+  until?: string;
+}
+
+export type SprintStatus = "planned" | "active" | "completed";
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  goal?: string;
+  status: SprintStatus;
+}
+
+export interface Cycle {
+  id: string;
+  projectId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface ProjectFormField {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date" | "textarea";
+  required?: boolean;
+}
+
+export interface ProjectForm {
+  id: string;
+  projectId: string;
+  slug: string;
+  title: string;
+  enabled: boolean;
+  fields: ProjectFormField[];
+}
+
+export interface SavedView {
+  id: string;
+  projectId: string;
+  userId?: string;
+  name: string;
+  viewMode: ViewMode;
+  filters: Record<string, unknown>;
+}
+
+export interface SprintVelocity {
+  sprintId: string;
+  sprintName: string;
+  committedPoints: number;
+  completedPoints: number;
+}
 
 export const DependencyType = {
   FS: "FS",
@@ -36,12 +106,29 @@ export interface Organization {
   defaultCurrency: Currency;
 }
 
+export interface UserAccount {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  organizationId?: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  user: UserAccount;
+}
+
 /** Project role code — free text, up to 3 letters (e.g. PMO, DEV). */
 export type ProjectMemberRole = string;
 
 export interface Project {
   id: string;
   organizationId: string;
+  /** תיקיית פרויקטים — parent folder */
+  parentId?: string | null;
+  /** תבנית לשכפול */
+  isTemplate?: boolean;
   name: string;
   description?: string;
   locale: Locale;
@@ -121,6 +208,57 @@ export interface Task {
   pausedAssigneeId?: string;
   /** הערות מהירות (MVP) */
   taskNotes?: string[];
+  /** תגיות */
+  tags?: string[];
+  description?: string;
+  descriptionHtml?: string;
+  issueType?: IssueType;
+  storyPoints?: number;
+  sprintId?: string;
+  cycleId?: string;
+  seriesId?: string;
+  recurrenceRule?: RecurrenceRule;
+  customFields?: Record<string, string | number | boolean | null>;
+}
+
+export interface TaskComment {
+  id: string;
+  projectId: string;
+  taskId: string;
+  userId: string;
+  userName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  projectId: string;
+  taskId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy?: string;
+  createdAt: string;
+  /** internal — not sent to client in list responses */
+  storagePath?: string;
+}
+
+export interface ActiveTimer {
+  id: string;
+  userId: string;
+  projectId: string;
+  taskId?: string;
+  startedAt: string;
+  stoppedAt?: string;
+}
+
+export interface SearchHit {
+  type: "task" | "project";
+  id: string;
+  projectId?: string;
+  title: string;
+  subtitle?: string;
 }
 
 export interface TaskDependency {
@@ -192,7 +330,7 @@ export interface CustomColumn {
   projectId: string;
   key: string;
   label: string;
-  type: "text" | "number" | "date" | "formula" | "multi_select";
+  type: "text" | "number" | "date" | "multi_select";
   options?: string[];
 }
 

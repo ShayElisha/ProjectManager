@@ -8,8 +8,23 @@ import { DataStoreService } from "../database/data-store.service";
 export class ProjectsService {
   constructor(private readonly db: DataStoreService) {}
 
-  findAll(): Project[] {
-    return this.db.getProjects();
+  findAll(filters?: {
+    organizationId?: string;
+    parentId?: string | null;
+    isTemplate?: boolean;
+  }): Project[] {
+    let list = this.db.getProjects();
+    if (filters?.organizationId) {
+      list = list.filter((p) => p.organizationId === filters.organizationId);
+    }
+    if (filters?.isTemplate !== undefined) {
+      list = list.filter((p) => !!p.isTemplate === filters.isTemplate);
+    }
+    if (filters && "parentId" in filters) {
+      const pid = filters.parentId ?? null;
+      list = list.filter((p) => (p.parentId ?? null) === pid);
+    }
+    return list;
   }
 
   findOne(id: string): Project {
@@ -94,6 +109,30 @@ export class ProjectsService {
     const ok = await this.db.deleteProject(id);
     if (!ok) throw new NotFoundException(`Project ${id} not found`);
     return { deleted: true };
+  }
+
+  async createFromTemplate(
+    templateId: string,
+    body: { name: string; organizationId?: string; parentId?: string | null },
+  ) {
+    const created = await this.db.cloneProjectFromTemplate(templateId, body);
+    if (!created) throw new NotFoundException(`Template ${templateId} not found`);
+    return created;
+  }
+
+  async duplicate(projectId: string, body: { name: string; organizationId?: string; parentId?: string | null }) {
+    const created = await this.db.duplicateProject(projectId, body);
+    if (!created) throw new NotFoundException(`Project ${projectId} not found`);
+    return created;
+  }
+
+  async saveAsTemplate(projectId: string, name?: string) {
+    const p = this.findOne(projectId);
+    const updated = await this.db.updateProject(projectId, {
+      isTemplate: true,
+      name: name ?? `${p.name} (template)`,
+    });
+    return updated;
   }
 
   exportProject(projectId: string) {

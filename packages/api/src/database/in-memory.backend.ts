@@ -1,4 +1,5 @@
 import type {
+  Organization,
   Project,
   Task,
   TaskDependency,
@@ -12,12 +13,36 @@ import type {
   ProjectRisk,
   ChangeRequest,
   ManualRejectionEntry,
+  TaskComment,
+  TaskAttachment,
+  ActiveTimer,
+  UserAccount,
+  CustomColumn,
+  Sprint,
+  Cycle,
+  ProjectForm,
+  SavedView,
 } from "@nexus/shared";
 import { buildSeedData } from "./seed-data";
 
+export interface StoredUserRecord extends UserAccount {
+  passwordHash: string;
+}
+
 export class InMemoryBackend {
+  organizations = new Map<string, Organization>();
   organizationName = "Nexus Corp";
   organizationId = "";
+  users = new Map<string, StoredUserRecord>();
+  usersByEmail = new Map<string, string>();
+  taskComments: TaskComment[] = [];
+  taskAttachments: TaskAttachment[] = [];
+  activeTimers: ActiveTimer[] = [];
+  customColumns = new Map<string, CustomColumn[]>();
+  sprints = new Map<string, Sprint[]>();
+  cycles = new Map<string, Cycle[]>();
+  projectForms = new Map<string, ProjectForm[]>();
+  savedViews = new Map<string, SavedView[]>();
   projects = new Map<string, Project>();
   tasks = new Map<string, Task[]>();
   dependencies = new Map<string, TaskDependency[]>();
@@ -37,6 +62,12 @@ export class InMemoryBackend {
     const data = buildSeedData();
     this.organizationId = data.organizationId;
     this.organizationName = data.organizationName;
+    this.organizations.set(data.organizationId, {
+      id: data.organizationId,
+      name: data.organizationName,
+      defaultLocale: "he",
+      defaultCurrency: "ILS",
+    });
     for (const p of data.projects) this.projects.set(p.id, p);
     for (const [k, v] of data.tasks) this.tasks.set(k, v);
     for (const [k, v] of data.dependencies) this.dependencies.set(k, v);
@@ -48,6 +79,11 @@ export class InMemoryBackend {
       this.risks.set(p.id, []);
       this.changeRequests.set(p.id, []);
       this.rejectionLogs.set(p.id, []);
+      if (!this.customColumns.has(p.id)) this.customColumns.set(p.id, []);
+      if (!this.sprints.has(p.id)) this.sprints.set(p.id, []);
+      if (!this.cycles.has(p.id)) this.cycles.set(p.id, []);
+      if (!this.projectForms.has(p.id)) this.projectForms.set(p.id, []);
+      if (!this.savedViews.has(p.id)) this.savedViews.set(p.id, []);
     }
     const lead = data.resources[0];
     if (lead) {
@@ -73,6 +109,12 @@ export class InMemoryBackend {
     this.baselines.clear();
     this.organizationId = data.organizationId;
     this.organizationName = data.organizationName;
+    this.organizations.set(data.organizationId, {
+      id: data.organizationId,
+      name: data.organizationName,
+      defaultLocale: "he",
+      defaultCurrency: "ILS",
+    });
     for (const p of data.projects) {
       this.projects.set(p.id, p);
       this.baselines.set(p.id, []);

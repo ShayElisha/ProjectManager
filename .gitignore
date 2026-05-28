@@ -11,6 +11,7 @@ packages/web/server/nest
 .env
 .env.local
 packages/api/data/
+packages/api/uploads/
 *.log
 .DS_Store
 coverage

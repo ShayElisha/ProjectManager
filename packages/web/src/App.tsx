@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
+import { useOrgStore } from "@/store/org-store";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { PublicOnlyRoute } from "@/components/auth/public-only-route";
 import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { RegisterPage } from "@/pages/register-page";
 import AppShell from "@/app-shell";
+import { PublicFormPage } from "@/pages/public-form-page";
 import { ConfirmSheet } from "@/components/ui/confirm-sheet";
 import { AppToaster } from "@/components/ui/app-toaster";
 
@@ -29,7 +31,11 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const ready = useAuthStore((s) => s.ready);
 
   useEffect(() => {
-    hydrate();
+    void hydrate().then(() => {
+      if (useAuthStore.getState().user) {
+        void useOrgStore.getState().loadOrganizations();
+      }
+    });
   }, [hydrate]);
 
   if (!ready) {
@@ -52,6 +58,7 @@ export default function App() {
         <ConfirmSheet />
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/f/:slug" element={<PublicFormPage />} />
           <Route
             path="/login"
             element={
