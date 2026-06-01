@@ -1,1 +1,3 @@
-module.exports = require("../scripts/vercel-api-handler.cjs");
+"use strict";
+
+module.exports = require("../packages/web/api/index.js");

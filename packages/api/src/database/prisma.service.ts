@@ -31,6 +31,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private connected = false;
 
   async onModuleInit() {
+    if (process.env.VERCEL) return;
     const url = process.env.DATABASE_URL?.trim() ?? "";
     if (!url) return;
     const isBuildStub =

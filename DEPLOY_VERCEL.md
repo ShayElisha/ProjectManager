@@ -69,7 +69,11 @@ vercel --prod
 
 **Production URL:** בדוק ב-Vercel → Domains את הדומיין האמיתי (למשל `core-pilote.vercel.app`). אם `/` מחזיר `404 NOT_FOUND`, הבילד לא העלה קבצים סטטיים.
 
-אחרי הבילד, `scripts/vercel-prepare.mjs` ממלא `dist/`, `public/`, ו-`server/nest` (מחוץ ל-`api/` — Vercel לא יפרוס אותו כ-endpoint נפרד).
+אחרי הבילד, `scripts/vercel-prepare.mjs` יוצר **`packages/web/api/runtime/`** — חבילת API עצמאית עם כל `node_modules` (דרך `pnpm deploy`), ומעתיק ל-`api/runtime/` לפריסה משורש הריפו.
+
+**בדיקת API אחרי deploy:**
+- `GET /api/auth/health` — תשובה מיידית (ללא Nest)
+- `POST /api/auth/login` — אמור להחזיר JSON תוך ~10–30 שניות ב-cold start הראשון
 
 אם Root Directory = `packages/web`, ה-API חייב להיות ב-`packages/web/api/` (כבר מוגדר ב-repo).
 

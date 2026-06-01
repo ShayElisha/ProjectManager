@@ -292,7 +292,13 @@ export class DataStoreService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
-    if (process.env.VERCEL) this.logger.warn("DataStore bootstrap:start");
+    if (process.env.VERCEL) {
+      this.mem.seed();
+      await this.ensureBootstrapAdminUser();
+      this.logger.warn("DataStore: Vercel fast bootstrap (in-memory; Atlas loads on demand)");
+      return;
+    }
+
     if (!this.useDb) {
       this.mem.seed();
       this.logger.warn("DataStore bootstrap:in-memory mode");
