@@ -215,7 +215,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  executiveSummary: () => fetchJson<ExecutiveSummary>("/ai/executive-summary"),
+  executiveSummary: () => fetchJson<ExecutiveSummary>("/portfolio/executive"),
   listRejections: (projectId?: string) =>
     fetchJson<RejectionRecord[]>(
       projectId ? `/rejections?projectId=${encodeURIComponent(projectId)}` : "/rejections",

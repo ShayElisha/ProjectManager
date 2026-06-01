@@ -1,11 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useAppStore, type AppSection } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
-import { OrgWorkspacePanel } from "@/components/features/org-workspace-panel";
 import { api } from "@/lib/api";
 
 const MORE_SECTIONS: { id: AppSection; labelKey: string }[] = [
-  { id: "enterprise", labelKey: "nav.enterprise" },
   { id: "timesheets", labelKey: "nav.timesheets" },
   { id: "team", labelKey: "nav.team" },
   { id: "budget", labelKey: "nav.budget" },
@@ -28,8 +26,6 @@ export function SettingsView() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <h2 className="text-xl font-semibold">{t("settings.title")}</h2>
-
-      <OrgWorkspacePanel />
 
       <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-4">
         <h3 className="text-sm font-medium text-[var(--muted)]">{t("settings.appearance")}</h3>

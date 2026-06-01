@@ -12,8 +12,6 @@ import {
 } from "lucide-react";
 import { useAppStore, type AppSection } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import { NotificationsBell } from "@/components/notifications-bell";
-
 /** Primary nav (≤5) — secondary sections live under Settings */
 const SECTIONS: { id: AppSection; icon: typeof FolderKanban; labelKey: string }[] = [
   { id: "dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
@@ -54,9 +52,6 @@ export function Sidebar() {
           <Icon size={20} />
         </button>
       ))}
-      <div className="mt-auto">
-        <NotificationsBell />
-      </div>
     </aside>
   );
 }

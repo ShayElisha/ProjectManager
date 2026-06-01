@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileDown } from "lucide-react";
 import type {
   ProjectStatusReport,
   ResourceLoadReport,
@@ -10,12 +9,8 @@ import type {
 import { useAppStore } from "@/store/app-store";
 import { api } from "@/lib/api";
 import { EvmDashboard } from "@/components/evm-dashboard";
-import { CustomReportBuilder } from "@/components/features/custom-report-builder";
-import { exportReportsPdf } from "@/lib/reports-pdf";
 import { cn } from "@/lib/utils";
 import { ViewSkeleton } from "@/components/ui/view-skeleton";
-import { Button } from "@/components/ui/button";
-
 export function ReportsView() {
   const { t } = useTranslation();
   const projects = useAppStore((s) => s.projects);
@@ -28,7 +23,7 @@ export function ReportsView() {
   const [resources, setResources] = useState<ResourceLoadReport | null>(null);
   const [cashflow, setCashflow] = useState<CashFlowReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const [widgets, setWidgets] = useState<ReportWidgetType[]>([
+  const [widgets] = useState<ReportWidgetType[]>([
     "status",
     "resources",
     "cashflow",
@@ -104,33 +99,7 @@ export function ReportsView() {
         >
           {t("reports.openBudget")}
         </button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!status}
-          onClick={() =>
-            exportReportsPdf({
-              projectName: selectedProject?.name ?? "",
-              status,
-              resources,
-              cashflow,
-              title: t("reports.title"),
-            })
-          }
-        >
-          <FileDown size={14} />
-          {t("reports.exportPdf")}
-        </Button>
       </div>
-
-      {projectId && (
-        <CustomReportBuilder
-          projectId={projectId}
-          selected={widgets}
-          onSelectedChange={setWidgets}
-        />
-      )}
 
       {loading && !status && <ViewSkeleton variant="detail" />}
 

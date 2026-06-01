@@ -1,24 +1,15 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from "@nestjs/common";
 import { TasksService } from "./tasks.service";
 import type { Task, TaskDependency, UserAccount } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
 import { assertProjectAccess } from "../common/org-access";
-import { AuditService } from "../audit/audit.service";
 
 @Controller("projects/:projectId/tasks")
 export class TasksController {
   constructor(
     private readonly tasks: TasksService,
     private readonly db: DataStoreService,
-    private readonly audit: AuditService,
   ) {}
-
-  private guardTask(user: UserAccount, projectId: string, taskId: string, level: "read" | "write") {
-    assertProjectAccess(this.db, user, projectId);
-    if (!this.db.canAccessTask(user.id, projectId, taskId, level)) {
-      throw new ForbiddenException("TASK_ACCESS_DENIED");
-    }
-  }
 
   @Get()
   list(@Req() req: { user: UserAccount }, @Param("projectId") projectId: string) {
@@ -98,26 +89,14 @@ export class TasksController {
   }
 
   @Patch(":taskId")
-  async update(
+  update(
     @Req() req: { user: UserAccount },
     @Param("projectId") projectId: string,
     @Param("taskId") taskId: string,
     @Body() body: Partial<Task>,
   ) {
-    this.guardTask(req.user, projectId, taskId, "write");
-    const project = this.db.getProject(projectId)!;
-    const task = await this.tasks.updateTask(projectId, taskId, body);
-    if (task) {
-      this.audit.log(
-        req.user,
-        project.organizationId,
-        "update",
-        "task",
-        `Updated task «${task.name}»`,
-        taskId,
-      );
-    }
-    return task;
+    assertProjectAccess(this.db, req.user, projectId);
+    return this.tasks.updateTask(projectId, taskId, body);
   }
 
   @Delete(":taskId")
@@ -126,7 +105,7 @@ export class TasksController {
     @Param("projectId") projectId: string,
     @Param("taskId") taskId: string,
   ) {
-    this.guardTask(req.user, projectId, taskId, "write");
+    assertProjectAccess(this.db, req.user, projectId);
     return this.tasks.deleteTask(projectId, taskId);
   }
 }

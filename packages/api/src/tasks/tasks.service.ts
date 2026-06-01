@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { v4 as uuid } from "uuid";
 import {
   calculateCPM,
@@ -16,22 +16,10 @@ import {
 } from "@nexus/shared";
 import type { Task, TaskDependency } from "@nexus/shared";
 import { DataStoreService } from "../database/data-store.service";
-import { RealtimeGateway } from "../realtime/realtime.gateway";
-import { runAutomationRules } from "../automation/automation.runner";
-import { runOrgAutomationRules } from "../automation/org-automation.runner";
-import { WebhookDispatcherService } from "../integrations/webhook-dispatcher.service";
 
 @Injectable()
 export class TasksService {
-  constructor(
-    private readonly db: DataStoreService,
-    @Optional() private readonly realtime?: RealtimeGateway,
-    @Optional() private readonly webhooks?: WebhookDispatcherService,
-  ) {}
-
-  private emit(projectId: string, event: string, payload: unknown): void {
-    this.realtime?.broadcast(projectId, event, payload);
-  }
+  constructor(private readonly db: DataStoreService) {}
 
   findByProject(projectId: string): { tasks: Task[]; dependencies: TaskDependency[] } {
     if (!this.db.getProject(projectId)) {
@@ -51,12 +39,6 @@ export class TasksService {
     const deps = this.db.getDependencies(projectId);
     const result = calculateCPM(tasks, deps, project.startDate);
     await this.db.setTasks(projectId, result.tasks);
-
-    this.emit(projectId, "schedule:updated", {
-      tasks: result.tasks,
-      criticalPathIds: result.criticalPathIds,
-      projectEnd: result.projectEnd,
-    });
 
     return result;
   }
@@ -132,29 +114,7 @@ export class TasksService {
     const updated = await this.db.updateTask(projectId, taskId, merged);
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
-    const project = this.db.getProject(projectId);
-    if (project) {
-      runOrgAutomationRules(this.db, project.organizationId, "task.updated", {
-        projectId,
-        task: updated,
-      });
-    }
-
-    this.db.logActivity({
-      projectId,
-      action: "update",
-      entityType: "task",
-      entityId: taskId,
-      summary: `Updated «${updated.name}»`,
-    });
-    runAutomationRules(this.db, projectId, updated, current, merged);
-    void this.webhooks?.dispatch(projectId, "task.updated", {
-      taskId: updated.id,
-      name: updated.name,
-    });
-
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 
@@ -175,20 +135,12 @@ export class TasksService {
     if (subtasks.length > 0) {
       return this.createTaskWithSubtasks(projectId, dto, subtasks);
     }
-    if (dto.recurrenceRule) {
-      const base = this.buildTaskBase(projectId, dto);
-      const created = await this.db.generateRecurringTasks(projectId, base, dto.recurrenceRule);
-      for (const t of created) this.emit(projectId, "task:created", t);
-      return created[0]!;
-    }
     const task = await this.persistTask(projectId, {
       ...dto,
       isSummary: true,
       percentComplete: 0,
       status: "not_started",
     });
-    this.emit(projectId, "task:created", task);
-    void this.webhooks?.dispatch(projectId, "task.created", { taskId: task.id, name: task.name });
     return task;
   }
 
@@ -259,12 +211,10 @@ export class TasksService {
         percentComplete: 0,
       });
       children.push(child);
-      this.emit(projectId, "task:created", child);
     }
 
     await this.rollupParent(projectId, parent.id);
     const refreshed = this.db.getTasks(projectId).find((t) => t.id === parent.id)!;
-    this.emit(projectId, "task:updated", refreshed);
     return { parent: refreshed, children };
   }
 
@@ -315,7 +265,6 @@ export class TasksService {
   async moveTask(sourceProjectId: string, taskId: string, targetProjectId: string) {
     const moved = await this.db.moveTaskToProject(sourceProjectId, taskId, targetProjectId);
     if (!moved) throw new NotFoundException("Task or target project not found");
-    this.emit(targetProjectId, "task:created", moved);
     return moved;
   }
 
@@ -449,7 +398,6 @@ export class TasksService {
       durationDays: existing?.durationDays ?? daysBetween(start, end) + 1,
       isSummary: true,
     });
-    if (parent) this.emit(projectId, "task:updated", parent);
   }
 
   async addDependency(
@@ -465,14 +413,12 @@ export class TasksService {
     }
     const dep: TaskDependency = { id: uuid(), projectId, ...dto };
     const created = await this.db.addDependency(dep);
-    this.emit(projectId, "dependency:added", created);
     return created;
   }
 
   async removeDependency(projectId: string, depId: string) {
     const ok = await this.db.removeDependency(projectId, depId);
     if (!ok) throw new NotFoundException(`Dependency ${depId} not found`);
-    this.emit(projectId, "dependency:removed", { id: depId });
     return { removed: true };
   }
 
@@ -551,7 +497,6 @@ export class TasksService {
         manuallyScheduled: true,
       });
       if (transferred) {
-        this.emit(projectId, "task:updated", transferred);
       }
     }
 
@@ -571,7 +516,6 @@ export class TasksService {
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 
@@ -601,7 +545,6 @@ export class TasksService {
     if (!updated) throw new NotFoundException(`Task ${taskId} not found`);
 
     await this.rollupParentIfNeeded(projectId, taskId, updated.parentId);
-    this.emit(projectId, "task:updated", updated);
     return updated;
   }
 
@@ -613,7 +556,6 @@ export class TasksService {
     const result = await this.db.deleteTask(projectId, taskId);
     if (!result) throw new NotFoundException(`Task ${taskId} not found`);
 
-    void this.webhooks?.dispatch(projectId, "task.deleted", { taskId, name: task.name });
     await this.recalculate(projectId);
     return { deletedIds: result.deletedIds };
   }

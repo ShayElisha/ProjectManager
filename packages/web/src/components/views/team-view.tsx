@@ -8,8 +8,6 @@ import { MemberCostFields } from "@/components/member-cost-fields";
 import { TeamMemberCostEditor } from "@/components/team-member-cost-editor";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
-import { ResourcePtoPanel } from "@/components/features/resource-pto-panel";
-
 export function TeamView() {
   const { t } = useTranslation();
   const activeProject = useAppStore((s) => s.activeProject);
@@ -226,7 +224,6 @@ export function TeamView() {
           </form>
         </section>
       </div>
-      <ResourcePtoPanel />
     </div>
   );
 }

@@ -22,16 +22,7 @@ import { api } from "@/lib/api";
 import { useOrgStore } from "@/store/org-store";
 import { useAuthStore } from "@/store/auth-store";
 import { tasksAlreadyLinked } from "@/lib/link-rules";
-import { io, Socket } from "socket.io-client";
 import { toast } from "@/lib/toast";
-
-let lastRealtimeToastAt = 0;
-function realtimeToast(key: string) {
-  const now = Date.now();
-  if (now - lastRealtimeToastAt < 4000) return;
-  lastRealtimeToastAt = now;
-  toast.info(key);
-}
 
 export type AppSection =
   | "dashboard"
@@ -46,8 +37,7 @@ export type AppSection =
   | "vendorQuotes"
   | "timesheets"
   | "reports"
-  | "settings"
-  | "enterprise";
+  | "settings";
 
 export interface CreateTaskInput {
   name: string;
@@ -88,15 +78,12 @@ interface AppState {
   resourceNames: Record<string, string>;
   notifications: Notification[];
   loading: boolean;
-  commandOpen: boolean;
   projectSettingsOpen: boolean;
   linkMode: boolean;
   linkSourceId: string | null;
   selectedTaskId: string | null;
   defaultLinkType: DependencyType;
   linkLagDays: number;
-  socket: Socket | null;
-  socketConnected: boolean;
   createTaskDialogOpen: boolean;
 
   setLocale: (locale: Locale) => void;
@@ -104,7 +91,6 @@ interface AppState {
   toggleTheme: () => void;
   setSection: (section: AppSection) => void;
   setView: (view: ViewMode) => void;
-  setCommandOpen: (open: boolean) => void;
   setProjectSettingsOpen: (open: boolean) => void;
   setCreateTaskDialogOpen: (open: boolean) => void;
   setLinkMode: (on: boolean) => void;
@@ -164,7 +150,6 @@ interface AppState {
   applyLeveling: (suggestion: LevelingSuggestion) => Promise<void>;
   autoLevelAll: () => Promise<void>;
   importProject: (file: File) => Promise<void>;
-  connectRealtime: (projectId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -189,15 +174,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   resourceNames: {},
   notifications: [],
   loading: false,
-  commandOpen: false,
   projectSettingsOpen: false,
   linkMode: false,
   linkSourceId: null,
   selectedTaskId: null,
   defaultLinkType: "FS",
   linkLagDays: 0,
-  socket: null,
-  socketConnected: false,
   createTaskDialogOpen: false,
 
   setLocale: (locale) => {
@@ -218,7 +200,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (section === "budget") void get().refreshBudgetSnapshot();
   },
   setView: (view) => set({ view }),
-  setCommandOpen: (open) => set({ commandOpen: open }),
   setProjectSettingsOpen: (open) => set({ projectSettingsOpen: open }),
   setCreateTaskDialogOpen: (open) => set({ createTaskDialogOpen: open }),
   setLinkMode: (on) => set({ linkMode: on, linkSourceId: null }),
@@ -307,7 +288,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         defaultLinkType: project.defaultLinkType ?? "FS",
         projects: get().projects.map((p) => (p.id === id ? project : p)),
       });
-      get().connectRealtime(id);
       await Promise.all([get().loadResources(), get().refreshBudgetSnapshot()]);
       if (keepSection) set({ section: prevSection });
     } finally {
@@ -629,9 +609,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (name.endsWith(".json")) {
       const { parseProjectJson } = await import("@/lib/project-excel");
       data = parseProjectJson(await file.text());
-    } else if (name.endsWith(".xml")) {
-      const { parseMspXml } = await import("@/lib/project-msp-xml");
-      data = parseMspXml(await file.text(), id);
     } else {
       const { parseProjectExcel } = await import("@/lib/project-excel");
       data = await parseProjectExcel(file, id);
@@ -652,46 +629,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().loadResources();
   },
 
-  connectRealtime: (projectId) => {
-    const socketEnabled =
-      import.meta.env.DEV || import.meta.env.VITE_ENABLE_SOCKET === "true";
-    if (!socketEnabled) return;
-
-    get().socket?.disconnect();
-    set({ socketConnected: false });
-    const socket = io("/", { path: "/socket.io", transports: ["websocket"] });
-    socket.on("connect", () => {
-      socket.emit("join:project", projectId);
-      set({ socketConnected: true });
-    });
-    socket.on("disconnect", () => set({ socketConnected: false }));
-    socket.on("schedule:updated", (payload: { tasks: Task[] }) => {
-      set({ tasks: payload.tasks });
-      void get().refreshBudgetSnapshot();
-      realtimeToast("toast.realtimeSchedule");
-    });
-    socket.on("task:updated", (task: Task) => {
-      set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) }));
-      void get().refreshBudgetSnapshot();
-      realtimeToast("toast.realtimeTask");
-    });
-    socket.on("task:created", (task: Task) => {
-      set((s) =>
-        s.tasks.some((t) => t.id === task.id) ? s : { tasks: [...s.tasks, task] },
-      );
-    });
-    socket.on("dependency:added", (dep: TaskDependency) => {
-      set((s) =>
-        s.dependencies.some((d) => d.id === dep.id)
-          ? s
-          : { dependencies: [...s.dependencies, dep] },
-      );
-    });
-    socket.on("dependency:removed", (payload: { id: string }) => {
-      set((s) => ({ dependencies: s.dependencies.filter((d) => d.id !== payload.id) }));
-    });
-    set({ socket });
-  },
 }));
 
 function addDays(iso: string, days: number): string {

@@ -25,11 +25,7 @@ export type ViewMode =
   | "grid"
   | "kanban"
   | "calendar"
-  | "timeline"
-  | "backlog"
-  | "roadmap"
-  | "whiteboard"
-  | "docs";
+  | "timeline";
 
 export type IssueType = "epic" | "story" | "task" | "bug";
 

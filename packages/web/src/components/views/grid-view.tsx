@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CustomColumn, Task } from "@nexus/shared";
-import { evaluateCustomFormula } from "@nexus/shared";
+import type { Task } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
 import { TaskDetailDrawer } from "@/components/task-detail-drawer";
-import { api } from "@/lib/api";
-import { loadGridColumns, saveGridColumns } from "@/components/features/saved-views-bar";
+import { loadGridColumns, saveGridColumns } from "@/lib/grid-columns";
 
 const BASE_COLS = ["wbs", "name", "startDate", "endDate", "durationDays", "percentComplete", "totalFloat"] as const;
 
@@ -16,33 +14,20 @@ export function GridView() {
   const updateTask = useAppStore((s) => s.updateTask);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; field: keyof Task } | null>(null);
-  const [customCols, setCustomCols] = useState<CustomColumn[]>([]);
   const [visible, setVisible] = useState<string[]>([...BASE_COLS]);
 
-  const loadCols = useCallback(async () => {
+  const loadCols = useCallback(() => {
     if (!activeProjectId) return;
-    const cols = await api.customColumns(activeProjectId);
-    setCustomCols(cols);
     const stored = loadGridColumns(activeProjectId);
-    const customKeys = cols.map((c) => `custom:${c.key}`);
-    setVisible(stored ?? [...BASE_COLS, ...customKeys]);
+    setVisible(stored ?? [...BASE_COLS]);
   }, [activeProjectId]);
 
   useEffect(() => {
-    void loadCols();
+    loadCols();
   }, [loadCols]);
 
-  useEffect(() => {
-    const onCols = (e: Event) => {
-      const d = (e as CustomEvent<{ projectId: string; columns: string[] }>).detail;
-      if (d.projectId === activeProjectId) setVisible(d.columns);
-    };
-    window.addEventListener("nexus-grid-cols-applied", onCols);
-    return () => window.removeEventListener("nexus-grid-cols-applied", onCols);
-  }, [activeProjectId]);
-
   const allColumns = useMemo(() => {
-    const base = BASE_COLS.map((id) => ({
+    return BASE_COLS.map((id) => ({
       id,
       label:
         id === "wbs"
@@ -59,13 +44,7 @@ export function GridView() {
                     ? t("task.progress")
                     : "Float",
     }));
-    const custom = customCols.map((c) => ({
-      id: `custom:${c.key}`,
-      label: c.label,
-      col: c,
-    }));
-    return [...base, ...custom];
-  }, [customCols, t]);
+  }, [t]);
 
   const toggleCol = (id: string) => {
     if (!activeProjectId) return;
@@ -88,16 +67,6 @@ export function GridView() {
   };
 
   const cellValue = (task: Task, colId: string): string => {
-    if (colId.startsWith("custom:")) {
-      const key = colId.slice(7);
-      const col = customCols.find((c) => c.key === key);
-      if (col?.type === "formula" && col.formula) {
-        const v = evaluateCustomFormula(col.formula, task.customFields ?? {});
-        return v == null ? "—" : String(v);
-      }
-      const v = task.customFields?.[key];
-      return v == null ? "—" : String(v);
-    }
     const v = task[colId as keyof Task];
     if (colId === "percentComplete") return `${task.percentComplete}%`;
     if (v == null) return "—";

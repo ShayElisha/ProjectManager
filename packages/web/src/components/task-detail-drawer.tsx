@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2, X } from "lucide-react";
-import type { DependencyType, IssueType, ScheduleConstraint, Task, TaskDependency } from "@nexus/shared";
+import type { DependencyType, ScheduleConstraint, Task, TaskDependency } from "@nexus/shared";
 
 const CONSTRAINTS: ScheduleConstraint[] = [
   "ASAP",
@@ -13,7 +13,6 @@ const CONSTRAINTS: ScheduleConstraint[] = [
   "FNET",
   "FNLT",
 ];
-import { api } from "@/lib/api";
 import { daysBetween } from "@/lib/dependency-anchors";
 import { tasksAlreadyLinked } from "@/lib/link-rules";
 import { clampWorkDays } from "@/lib/task-tree";
@@ -21,11 +20,6 @@ import { remainingWorkDaysFromProgress } from "@/lib/task-pause";
 import { useAppStore } from "@/store/app-store";
 import { confirmAction } from "@/lib/confirm";
 import { Button } from "@/components/ui/button";
-import { TaskCollaborationSection } from "@/components/features/task-collaboration-section";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
-
-const ISSUE_TYPES: IssueType[] = ["epic", "story", "task", "bug"];
-
 const LINK_TYPES: DependencyType[] = ["FS", "SS", "FF", "SF"];
 
 interface Props {
@@ -36,9 +30,6 @@ interface Props {
 export function TaskDetailDrawer({ taskId, onClose }: Props) {
   const { t } = useTranslation();
   const tasks = useAppStore((s) => s.tasks);
-  const projects = useAppStore((s) => s.projects);
-  const activeProjectId = useAppStore((s) => s.activeProjectId);
-  const selectProject = useAppStore((s) => s.selectProject);
   const dependencies = useAppStore((s) => s.dependencies);
   const defaultLinkType = useAppStore((s) => s.defaultLinkType);
   const updateTask = useAppStore((s) => s.updateTask);
@@ -139,14 +130,7 @@ export function TaskDetailDrawer({ taskId, onClose }: Props) {
     "actualLaborCost",
     "actualMaterialCost",
     "actualOtherCost",
-    "tags",
     "description",
-    "descriptionHtml",
-    "issueType",
-    "storyPoints",
-    "sprintId",
-    "cycleId",
-    "customFields",
   ] as const;
   const hasDraftChanges = draftKeys.some((k) => draft[k] !== undefined && draft[k] !== task[k]);
 
@@ -252,73 +236,14 @@ export function TaskDetailDrawer({ taskId, onClose }: Props) {
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="text-[var(--muted)]">{t("features.issueType")}</span>
-              <select
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
-                value={draft.issueType ?? task.issueType ?? "task"}
-                onChange={(e) => setDraft({ ...draft, issueType: e.target.value as IssueType })}
-              >
-                {ISSUE_TYPES.map((it) => (
-                  <option key={it} value={it}>
-                    {it}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="text-[var(--muted)]">{t("features.storyPoints")}</span>
-              <input
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
-                value={draft.storyPoints ?? task.storyPoints ?? ""}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    storyPoints: e.target.value === "" ? undefined : Number(e.target.value),
-                  })
-                }
-              />
-            </label>
-          </div>
           <label className="block text-sm">
-            <span className="text-[var(--muted)]">{t("features.descriptionRich")}</span>
-            <div className="mt-1">
-              <RichTextEditor
-                value={draft.descriptionHtml ?? task.descriptionHtml ?? ""}
-                onChange={(html) => setDraft({ ...draft, descriptionHtml: html })}
-              />
-            </div>
+            <span className="text-[var(--muted)]">{t("task.description")}</span>
+            <textarea
+              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 min-h-[80px]"
+              value={draft.description ?? task.description ?? ""}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            />
           </label>
-          {projects.length > 1 && activeProjectId && (
-            <label className="block text-sm">
-              <span className="text-[var(--muted)]">{t("features.moveToProject")}</span>
-              <select
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2"
-                defaultValue=""
-                onChange={(e) => {
-                  const target = e.target.value;
-                  if (!target || !task) return;
-                  void api.moveTask(activeProjectId, task.id, target).then(() => {
-                    void selectProject(target);
-                    onClose();
-                  });
-                  e.target.value = "";
-                }}
-              >
-                <option value="">—</option>
-                {projects
-                  .filter((p) => p.id !== activeProjectId)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">
               <span className="text-[var(--muted)]">{t("task.start")}</span>
@@ -705,11 +630,6 @@ export function TaskDetailDrawer({ taskId, onClose }: Props) {
             </div>
           </section>
 
-          <TaskCollaborationSection
-            taskId={task.id}
-            tags={draft.tags ?? task.tags ?? []}
-            onTagsChange={(tags) => setDraft((d) => ({ ...d, tags }))}
-          />
         </div>
         <div className="border-t border-[var(--border)] p-4 flex flex-col gap-2">
           <div className="flex gap-2">

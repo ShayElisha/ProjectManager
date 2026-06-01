@@ -7,28 +7,18 @@ import {
   Columns3,
   Calendar,
   GitBranch,
-  ListTodo,
-  Map,
-  StickyNote,
-  BookOpen,
   Moon,
   Sun,
-  Search,
   RefreshCw,
   LogOut,
   BarChart3,
   Users,
   FolderPlus,
-  Radio,
-  UsersRound,
 } from "lucide-react";
 import { ViewMode } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
-import { useIsMobile } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
-import { CommandPalette } from "@/components/command-palette";
-import { AiCopilot } from "@/components/ai-copilot";
 import { EVMPanel } from "@/components/evm-panel";
 import { ResourcesPanel } from "@/components/resources-panel";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -39,10 +29,6 @@ import { GridView } from "@/components/views/grid-view";
 import { KanbanView } from "@/components/views/kanban-view";
 import { CalendarView } from "@/components/views/calendar-view";
 import { TimelineView } from "@/components/views/timeline-view";
-import { BacklogView } from "@/components/views/backlog-view";
-import { RoadmapView } from "@/components/views/roadmap-view";
-import { WhiteboardView } from "@/components/views/whiteboard-view";
-import { DocsView } from "@/components/views/docs-view";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { PortfolioView } from "@/components/views/portfolio-view";
 import { PmoView } from "@/components/views/pmo-view";
@@ -53,7 +39,6 @@ import { TimesheetsView } from "@/components/views/timesheets-view";
 import { ReportsView } from "@/components/views/reports-view";
 import { BudgetView } from "@/components/views/budget-view";
 import { SettingsView } from "@/components/views/settings-view";
-import { EnterpriseAdminPanel } from "@/components/features/enterprise-admin-panel";
 import { TeamView } from "@/components/views/team-view";
 import { VendorQuotesView } from "@/components/views/vendor-quotes-view";
 import { ProjectConfigPanel } from "@/components/project-config-panel";
@@ -61,10 +46,6 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import i18n, { initI18n } from "@/i18n";
 import { useAppUrl } from "@/hooks/use-app-url";
-import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
-import { SavedViewsBar } from "@/components/features/saved-views-bar";
-import { ProjectHubPanel } from "@/components/features/project-hub-panel";
 
 const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   gantt: GanttIcon,
@@ -72,22 +53,15 @@ const VIEW_ICONS: Record<ViewMode, typeof GanttIcon> = {
   kanban: Columns3,
   calendar: Calendar,
   timeline: GitBranch,
-  backlog: ListTodo,
-  roadmap: Map,
-  whiteboard: StickyNote,
-  docs: BookOpen,
 };
 
-type SideDrawer = "resources" | "evm" | "hub" | null;
+type SideDrawer = "resources" | "evm" | null;
 
 export default function AppShell() {
   useAppUrl();
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  useKeyboardShortcuts(() => setShortcutsOpen(true));
   const refreshTasks = useAppStore((s) => s.refreshTasks);
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const locale = useAppStore((s) => s.locale);
@@ -97,11 +71,9 @@ export default function AppShell() {
   const projects = useAppStore((s) => s.projects);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
   const loading = useAppStore((s) => s.loading);
-  const socketConnected = useAppStore((s) => s.socketConnected);
   const setLocale = useAppStore((s) => s.setLocale);
   const setView = useAppStore((s) => s.setView);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
-  const setCommandOpen = useAppStore((s) => s.setCommandOpen);
   const loadProjects = useAppStore((s) => s.loadProjects);
   const selectProject = useAppStore((s) => s.selectProject);
   const recalculate = useAppStore((s) => s.recalculate);
@@ -118,9 +90,7 @@ export default function AppShell() {
   }, []);
 
   useEffect(() => {
-    const socketEnabled =
-      import.meta.env.DEV || import.meta.env.VITE_ENABLE_SOCKET === "true";
-    if (socketEnabled || !activeProjectId || section !== "project") return;
+    if (!activeProjectId || section !== "project") return;
     const id = window.setInterval(() => void refreshTasks(), 20_000);
     return () => window.clearInterval(id);
   }, [activeProjectId, section, refreshTasks]);
@@ -145,10 +115,6 @@ export default function AppShell() {
     kanban: KanbanView,
     calendar: CalendarView,
     timeline: TimelineView,
-    backlog: BacklogView,
-    roadmap: RoadmapView,
-    whiteboard: WhiteboardView,
-    docs: DocsView,
   }[view];
 
   const handleLogout = () => {
@@ -187,15 +153,6 @@ export default function AppShell() {
                   </option>
                 ))}
               </select>
-              {socketConnected && (
-                <span
-                  className="hidden items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 sm:inline-flex"
-                  title={t("toast.realtimeConnected")}
-                >
-                  <Radio size={10} className="animate-pulse" />
-                  {t("ux.live")}
-                </span>
-              )}
             </div>
 
             <nav className="order-last flex w-full min-w-0 items-center gap-0.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:order-none md:ms-auto md:w-auto md:pb-0 [&::-webkit-scrollbar]:hidden">
@@ -237,15 +194,6 @@ export default function AppShell() {
         >
           {section === "project" && projects.length > 0 && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSideDrawer((d) => (d === "hub" ? null : "hub"))}
-                title={t("hub.openHub")}
-              >
-                <UsersRound size={14} />
-                <span className="hidden sm:inline">{t("hub.openHub")}</span>
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -292,10 +240,6 @@ export default function AppShell() {
               </Button>
             </>
           )}
-          <Button variant="outline" size="sm" onClick={() => setCommandOpen(true)}>
-            <Search size={14} />
-            <span className="hidden sm:inline">Ctrl+K</span>
-          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={toggleTheme}>
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
@@ -344,7 +288,6 @@ export default function AppShell() {
               ) : (
                 <>
                   <ProjectToolbar />
-                  <SavedViewsBar />
                   <div className="min-h-0 flex-1">
                     <ViewComponent />
                   </div>
@@ -380,11 +323,6 @@ export default function AppShell() {
           {section === "reports" && <ReportsView />}
           {section === "timesheets" && <TimesheetsView />}
           {section === "settings" && <SettingsView />}
-          {section === "enterprise" && (
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 md:p-6">
-              <EnterpriseAdminPanel />
-            </div>
-          )}
         </main>
         {section === "project" && projects.length > 0 && (
           <>
@@ -394,16 +332,12 @@ export default function AppShell() {
               <ResourcesPanel overlay onClose={closeDrawer} />
             )}
             {sideDrawer === "evm" && <EVMPanel overlay onClose={closeDrawer} />}
-            {sideDrawer === "hub" && <ProjectHubPanel onClose={closeDrawer} />}
           </>
         )}
       </div>
 
       <MobileBottomNav />
-      <CommandPalette />
-      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <ProjectConfigPanel open={projectSettingsOpen} onClose={() => setProjectSettingsOpen(false)} />
-      {section === "project" && <AiCopilot hasBottomNav={isMobile} />}
     </div>
   );
 }

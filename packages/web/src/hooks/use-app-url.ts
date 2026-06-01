@@ -3,17 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { ViewMode } from "@nexus/shared";
 import { useAppStore, type AppSection } from "@/store/app-store";
 
-const VIEW_MODES: ViewMode[] = [
-  "gantt",
-  "grid",
-  "kanban",
-  "calendar",
-  "timeline",
-  "backlog",
-  "roadmap",
-  "whiteboard",
-  "docs",
-];
+const VIEW_MODES: ViewMode[] = ["gantt", "grid", "kanban", "calendar", "timeline"];
 
 const SECTIONS: AppSection[] = [
   "dashboard",
@@ -29,7 +19,6 @@ const SECTIONS: AppSection[] = [
   "timesheets",
   "reports",
   "settings",
-  "enterprise",
 ];
 
 function isViewMode(v: string): v is ViewMode {

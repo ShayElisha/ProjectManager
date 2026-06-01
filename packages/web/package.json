@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build:vercel": "pnpm -w run build:vercel",
+    "icons": "node ./scripts/generate-pwa-icons.mjs",
     "build": "tsc -b && vite build && node ./scripts/sync-public.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
@@ -22,7 +23,6 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
     "i18next": "^24.2.3",
     "lucide-react": "^0.484.0",
     "react": "^19.0.0",

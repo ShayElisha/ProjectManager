@@ -52,26 +52,6 @@ export class ResourcesController {
     );
   }
 
-  @Get("pto")
-  pto(@Query("resourceId") resourceId?: string) {
-    return this.resources.listPto(resourceId);
-  }
-
-  @Post("pto")
-  createPto(
-    @Body() body: { resourceId: string; startDate: string; endDate: string; label?: string },
-  ) {
-    return this.resources.createPto(body);
-  }
-
-  @Get("match-skills")
-  matchSkills(
-    @Param("projectId") projectId: string,
-    @Query("skills") skills: string,
-  ) {
-    return this.resources.matchSkillsForProject(projectId, skills ?? "");
-  }
-
   @Get("histogram")
   histogram(
     @Param("projectId") projectId: string,

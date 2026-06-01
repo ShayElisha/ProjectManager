@@ -54,36 +54,6 @@ export class ProjectsController {
     return this.projects.create({ ...body, organizationId });
   }
 
-  @Post(":id/duplicate")
-  duplicate(
-    @Req() req: { user: UserAccount },
-    @Param("id") id: string,
-    @Body() body: { name: string; organizationId?: string; parentId?: string | null },
-  ) {
-    assertProjectAccess(this.db, req.user, id);
-    return this.projects.duplicate(id, body);
-  }
-
-  @Post("from-template/:templateId")
-  createFromTemplate(
-    @Req() req: { user: UserAccount },
-    @Param("templateId") templateId: string,
-    @Body() body: { name: string; organizationId?: string; parentId?: string | null },
-  ) {
-    assertProjectAccess(this.db, req.user, templateId);
-    return this.projects.createFromTemplate(templateId, body);
-  }
-
-  @Post(":id/save-as-template")
-  saveAsTemplate(
-    @Req() req: { user: UserAccount },
-    @Param("id") id: string,
-    @Body() body: { name?: string },
-  ) {
-    assertProjectAccess(this.db, req.user, id);
-    return this.projects.saveAsTemplate(id, body.name);
-  }
-
   @Patch(":id")
   update(
     @Req() req: { user: UserAccount },
@@ -104,16 +74,6 @@ export class ProjectsController {
   evm(@Req() req: { user: UserAccount }, @Param("id") id: string) {
     assertProjectAccess(this.db, req.user, id);
     return this.projects.getEVM(id);
-  }
-
-  @Post(":id/import")
-  import(
-    @Req() req: { user: UserAccount },
-    @Param("id") id: string,
-    @Body() body: { tasks?: unknown[]; dependencies?: unknown[] },
-  ) {
-    assertProjectAccess(this.db, req.user, id);
-    return this.projects.importProject(id, body as { tasks?: import("@nexus/shared").Task[]; dependencies?: import("@nexus/shared").TaskDependency[] });
   }
 
   @Get(":id/export")
