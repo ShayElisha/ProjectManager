@@ -33,14 +33,13 @@ if (!existsSync(apiDist)) {
   process.exit(1);
 }
 
-/** Self-contained API + node_modules for Vercel serverless (pnpm deploy). */
+/** Self-contained API + production node_modules for Vercel serverless. */
 function deployApiRuntime(targetDir) {
   rmSync(targetDir, { recursive: true, force: true });
   mkdirSync(dirname(targetDir), { recursive: true });
-  console.log(`[vercel-prepare] pnpm deploy → ${targetDir}`);
-  run(`pnpm --filter @nexus/api deploy "${targetDir}"`);
-  console.log(`[vercel-prepare] prisma generate in runtime`);
-  run("pnpm exec prisma generate --schema=./prisma/schema.prisma", targetDir);
+  console.log(`[vercel-prepare] pnpm deploy --prod → ${targetDir}`);
+  run(`pnpm --filter @nexus/api deploy --prod "${targetDir}"`);
+  run(`node scripts/prune-api-runtime.mjs "${targetDir}"`);
   const entry = resolve(targetDir, "dist/serverless.js");
   if (!existsSync(entry)) {
     console.error(`[vercel-prepare] Missing ${entry}`);
@@ -68,12 +67,14 @@ for (const dir of [
   rmSync(dir, { recursive: true, force: true });
 }
 
-const webRuntime = resolve(monorepoRoot, "packages/web/api/runtime");
 const rootRuntime = resolve(monorepoRoot, "api/runtime");
+const webRuntime = resolve(monorepoRoot, "packages/web/api/runtime");
 
-deployApiRuntime(webRuntime);
-cpSync(webRuntime, rootRuntime, { recursive: true });
-console.log(`[vercel-prepare] API runtime copied → ${rootRuntime}`);
+deployApiRuntime(rootRuntime);
+rmSync(webRuntime, { recursive: true, force: true });
+mkdirSync(dirname(webRuntime), { recursive: true });
+cpSync(rootRuntime, webRuntime, { recursive: true });
+console.log(`[vercel-prepare] API runtime mirrored → ${webRuntime}`);
 
 for (const dir of [
   resolve(monorepoRoot, "packages/web/dist"),
@@ -87,8 +88,8 @@ for (const dir of [
 const mustExist = [
   resolve(monorepoRoot, "packages/web/dist/index.html"),
   resolve(monorepoRoot, "packages/web/public/index.html"),
-  resolve(webRuntime, "dist/serverless.js"),
-  resolve(webRuntime, "node_modules/@nestjs/common/package.json"),
+  resolve(rootRuntime, "dist/serverless.js"),
+  resolve(rootRuntime, "node_modules/@nestjs/common/package.json"),
 ];
 
 for (const file of mustExist) {
