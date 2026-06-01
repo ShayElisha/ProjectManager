@@ -1107,7 +1107,8 @@
     "errorGeneric": "Something went wrong — try again",
     "errorEmailExists": "Email already registered",
     "errorPasswordMatch": "Passwords do not match",
-    "errorPasswordShort": "Password must be at least 6 characters"
+    "errorPasswordShort": "Password must be at least 6 characters",
+    "bootstrapHint": "Fresh deploy: admin@nexus.local / admin1234 — or sign up below"
   },
   "features": {
     "workspaces": "Workspaces",

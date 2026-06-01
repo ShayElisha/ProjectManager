@@ -71,10 +71,25 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    if (res.status >= 500 && (!text || text.includes("ECONNREFUSED") || text.includes("proxy"))) {
-      throw new Error(
-        "השרת (API) לא זמין. הרץ מהשורש: pnpm dev — או בנפרד: cd packages/api && pnpm dev",
-      );
+    if (res.status >= 500) {
+      if (
+        !text ||
+        text.includes("ECONNREFUSED") ||
+        text.includes("proxy") ||
+        text.includes("FUNCTION_INVOCATION_FAILED")
+      ) {
+        throw new Error(
+          "השרת (API) לא זמין. בפריסה: בדוק Vercel Logs ו-DATABASE_URL. מקומית: pnpm dev",
+        );
+      }
+    }
+    try {
+      const body = JSON.parse(text) as { message?: string | string[] };
+      const msg = body.message;
+      if (typeof msg === "string") throw new Error(msg);
+      if (Array.isArray(msg)) throw new Error(msg.join(", "));
+    } catch (e) {
+      if (e instanceof Error && e.message !== text && !(e instanceof SyntaxError)) throw e;
     }
     throw new Error(text || `HTTP ${res.status} ${res.statusText}`);
   }

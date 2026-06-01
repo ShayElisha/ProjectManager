@@ -109,6 +109,9 @@ export function LoginPage() {
         <Button type="submit" className="w-full h-11" disabled={loading}>
           {loading ? t("auth.loading") : t("auth.login")}
         </Button>
+        <p className="text-center text-xs text-[var(--muted)]">
+          {t("auth.bootstrapHint")}
+        </p>
       </form>
     </AuthLayout>
   );

@@ -19,6 +19,8 @@
 | `DATABASE_URL` | `mongodb+srv://user:pass@cluster.mongodb.net/nexus_project` | כן |
 | `CORS_ORIGINS` | `https://your-app.vercel.app` | כן (כתובת האתר שלך) |
 | `USE_EMBEDDED_MONGO` | `false` | מומלץ |
+| `BOOTSTRAP_ADMIN_EMAIL` | `admin@nexus.local` | אופציונלי |
+| `BOOTSTRAP_ADMIN_PASSWORD` | `admin1234` | אופציונלי |
 
 > ב-Atlas: Network Access → Allow `0.0.0.0/0` (או IP של Vercel), ו-Database User עם הרשאות read/write.
 
@@ -77,10 +79,23 @@ vercel --prod
 
 ```
 vercel.json          → build + SPA fallback + rewrite ל-API
-api/index.js         → כל בקשות /api/* (מייבא מ-`server/nest/serverless.js` שנבנה בבילד)
+api/index.js         → כל בקשות /api/* (מייבא מ-`@nexus/api/dist/serverless.js`)
 packages/web/dist    → React SPA
 packages/api/dist    → NestJS (serverless-http)
 ```
+
+## התחברות (Login)
+
+בפריסה ריקה (אין משתמשים ב-MongoDB) נוצר אוטומטית חשבון מנהל:
+
+| שדה | ברירת מחדל |
+|-----|------------|
+| אימייל | `admin@nexus.local` |
+| סיסמה | `admin1234` |
+
+ניתן לשנות ב-Vercel: `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`.
+
+אפשר גם **הרשמה** (`/register`) — המשתמש נשמר ב-`DATABASE_URL` (Atlas). בלי MongoDB תקין, הנתונים עלולים להימחק ב-cold start (מצב in-memory).
 
 ## הערות
 

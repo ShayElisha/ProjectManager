@@ -16,7 +16,7 @@
     "api/index.js": {
       "maxDuration": 60,
       "memory": 1024,
-      "includeFiles": "node_modules/@nexus/api/**,node_modules/@prisma/**,node_modules/.prisma/**"
+      "includeFiles": "node_modules/@nexus/api/**,node_modules/@nestjs/**,node_modules/@prisma/**,node_modules/.prisma/**,node_modules/multer/**,node_modules/serverless-http/**,node_modules/bcryptjs/**"
     }
   },
   "rewrites": [

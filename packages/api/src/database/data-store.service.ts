@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import * as bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 import type {
   Organization,
@@ -42,7 +43,7 @@ import { PrismaService } from "./prisma.service";
 import { InMemoryBackend } from "./in-memory.backend";
 import { buildSeedData } from "./seed-data";
 
-const DB_BOOTSTRAP_TIMEOUT_MS = 8000;
+const DB_BOOTSTRAP_TIMEOUT_MS = process.env.VERCEL ? 5000 : 8000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -295,6 +296,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (!this.useDb) {
       this.mem.seed();
       this.logger.warn("DataStore bootstrap:in-memory mode");
+      await this.ensureBootstrapAdminUser();
       return;
     }
 
@@ -318,7 +320,24 @@ export class DataStoreService implements OnApplicationBootstrap {
       );
       this.mem.seed();
     }
+    await this.ensureBootstrapAdminUser();
     if (process.env.VERCEL) this.logger.warn("DataStore bootstrap:done");
+  }
+
+  /** First login on empty deploy (Vercel in-memory or fresh Atlas). Override via BOOTSTRAP_ADMIN_* env. */
+  private async ensureBootstrapAdminUser(): Promise<void> {
+    if (this.mem.users.size > 0) return;
+    const email = (process.env.BOOTSTRAP_ADMIN_EMAIL ?? "admin@nexus.local").trim().toLowerCase();
+    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "admin1234";
+    const orgId = await this.ensureDefaultOrganizationId();
+    await this.createUser({
+      email,
+      name: "Admin",
+      passwordHash: await bcrypt.hash(password, 10),
+      role: "admin",
+      organizationId: orgId,
+    });
+    this.logger.warn(`Bootstrap admin ready (${email}) — change password after first login`);
   }
 
   private async seedDatabase() {

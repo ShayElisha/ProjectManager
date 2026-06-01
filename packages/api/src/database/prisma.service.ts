@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 
-const DB_CONNECT_TIMEOUT_MS = 7000;
+const DB_CONNECT_TIMEOUT_MS = process.env.VERCEL ? 3500 : 7000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {

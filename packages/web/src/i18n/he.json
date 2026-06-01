@@ -1107,7 +1107,8 @@
     "errorGeneric": "משהו השתבש — נסו שוב",
     "errorEmailExists": "האימייל כבר רשום",
     "errorPasswordMatch": "הסיסמאות אינן תואמות",
-    "errorPasswordShort": "הסיסמה חייבת להכיל לפחות 6 תווים"
+    "errorPasswordShort": "הסיסמה חייבת להכיל לפחות 6 תווים",
+    "bootstrapHint": "פריסה חדשה: admin@nexus.local / admin1234 — או הירשמו למטה"
   },
   "features": {
     "workspaces": "סביבות עבודה",
