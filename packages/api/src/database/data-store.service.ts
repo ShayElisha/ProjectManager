@@ -308,7 +308,11 @@ export class DataStoreService implements OnApplicationBootstrap {
             await this.seedDatabase();
             this.logger.log("DataStore: empty organization ready (no demo projects)");
           }
-          await this.hydrateFromDatabase();
+          if (process.env.VERCEL) {
+            await this.hydrateLiteFromDatabase();
+          } else {
+            await this.hydrateFromDatabase();
+          }
         })(),
         DB_BOOTSTRAP_TIMEOUT_MS,
         "DataStore bootstrap",
@@ -372,6 +376,256 @@ export class DataStoreService implements OnApplicationBootstrap {
         });
       }
     }
+  }
+
+  /** Vercel: batch queries only — avoids N+1 per project (prevents 60s+ cold start). */
+  private async hydrateLiteFromDatabase(): Promise<void> {
+    const orgs = await this.prisma.organization.findMany();
+    const org = orgs[0];
+    if (!org) return;
+
+    for (const o of orgs) {
+      this.mem.organizations.set(o.id, {
+        id: o.id,
+        name: o.name,
+        defaultLocale: o.defaultLocale as Organization["defaultLocale"],
+        defaultCurrency: o.defaultCurrency as Organization["defaultCurrency"],
+      });
+    }
+
+    try {
+      const dbUsers = await this.prisma.user.findMany();
+      for (const u of dbUsers) {
+        this.mem.users.set(u.id, {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role as UserRole,
+          organizationId: u.organizationId ?? undefined,
+          passwordHash: u.passwordHash,
+          totpSecret: u.totpSecret ?? undefined,
+          totpEnabled: u.totpEnabled ?? false,
+        });
+        this.mem.usersByEmail.set(u.email, u.id);
+      }
+    } catch {
+      /* users table may be empty */
+    }
+
+    const data = buildSeedData();
+    data.organizationId = org.id;
+    data.organizationName = org.name;
+    data.projects = [];
+    data.tasks = new Map();
+    data.dependencies = new Map();
+    data.assignments = new Map();
+
+    const rawResources = await this.prisma.resource.findMany({ where: { organizationId: org.id } });
+    data.resources = rawResources.map((r) => ({
+      ...r,
+      type: r.type as Resource["type"],
+      email: r.email ?? undefined,
+      costPerHour: r.costPerHour ?? undefined,
+      costPerUnit: r.costPerUnit ?? undefined,
+      calendarId: r.calendarId ?? undefined,
+    }));
+
+    const projects = await this.prisma.project.findMany();
+    for (const p of projects) {
+      data.projects.push({
+        id: p.id,
+        organizationId: p.organizationId,
+        parentId: p.parentId ?? null,
+        isTemplate: p.isTemplate ?? false,
+        name: p.name,
+        description: p.description ?? undefined,
+        locale: p.locale as Project["locale"],
+        currency: p.currency as Project["currency"],
+        startDate: p.startDate,
+        endDate: p.endDate ?? undefined,
+        status: p.status as Project["status"],
+        budgetCap: p.budgetCap ?? undefined,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      });
+    }
+
+    const projectIds = new Set(data.projects.map((p) => p.id));
+    const groupByProject = <T extends { projectId: string }>(rows: T[]) => {
+      const m = new Map<string, T[]>();
+      for (const row of rows) {
+        if (!projectIds.has(row.projectId)) continue;
+        const list = m.get(row.projectId) ?? [];
+        list.push(row);
+        m.set(row.projectId, list);
+      }
+      return m;
+    };
+
+    for (const l of await this.prisma.budgetLineItem.findMany()) {
+      if (!projectIds.has(l.projectId)) continue;
+      const lines = this.mem.budgetLines.get(l.projectId) ?? [];
+      lines.push({
+        id: l.id,
+        projectId: l.projectId,
+        category: l.category as BudgetLineItem["category"],
+        name: l.name,
+        description: l.description ?? undefined,
+        plannedAmount: l.plannedAmount,
+        committedAmount: l.committedAmount ?? undefined,
+        actualAmount: l.actualAmount,
+        cashMonth: l.cashMonth,
+        taskId: l.taskId ?? undefined,
+        source: (l.source as BudgetLineItem["source"]) ?? undefined,
+        sourceRef: l.sourceRef ?? undefined,
+      });
+      this.mem.budgetLines.set(l.projectId, lines);
+    }
+
+    for (const t of await this.prisma.task.findMany({ orderBy: { sortOrder: "asc" } })) {
+      const list = data.tasks.get(t.projectId) ?? [];
+      list.push(mapTask(t));
+      data.tasks.set(t.projectId, list);
+    }
+
+    for (const [pid, deps] of groupByProject(await this.prisma.taskDependency.findMany())) {
+      data.dependencies.set(pid, deps.map((d) => ({ ...d, type: d.type as TaskDependency["type"] })));
+    }
+
+    for (const [pid, rows] of groupByProject(await this.prisma.resourceAssignment.findMany())) {
+      data.assignments.set(pid, rows);
+    }
+
+    for (const b of await this.prisma.baseline.findMany()) {
+      if (!projectIds.has(b.projectId)) continue;
+      const list = this.mem.baselines.get(b.projectId) ?? [];
+      list.push({
+        id: b.id,
+        projectId: b.projectId,
+        index: b.index,
+        name: b.name,
+        savedAt: b.savedAt.toISOString(),
+        tasks: b.tasks as Baseline["tasks"],
+      });
+      this.mem.baselines.set(b.projectId, list);
+    }
+
+    for (const [pid, members] of groupByProject(await this.prisma.projectMember.findMany())) {
+      this.mem.projectMembers.set(
+        pid,
+        members.map((m) => ({
+          id: m.id,
+          projectId: m.projectId,
+          resourceId: m.resourceId,
+          role: m.role,
+          hoursPerDay: m.hoursPerDay ?? undefined,
+        })),
+      );
+    }
+
+    try {
+      for (const [pid, risks] of groupByProject(await this.prisma.projectRisk.findMany())) {
+        this.mem.risks.set(pid, risks.map((r) => mapPrismaRisk(r)));
+      }
+    } catch {
+      /* optional tables */
+    }
+
+    try {
+      for (const [pid, changes] of groupByProject(await this.prisma.changeRequest.findMany())) {
+        this.mem.changeRequests.set(
+          pid,
+          changes.map((c) => ({
+            id: c.id,
+            projectId: c.projectId,
+            title: c.title,
+            description: c.description ?? undefined,
+            impactScheduleDays: c.impactScheduleDays,
+            impactCost: c.impactCost,
+            status: c.status as ChangeRequest["status"],
+            requestedBy: c.requestedBy ?? undefined,
+            decidedAt: c.decidedAt?.toISOString(),
+            decisionNote: c.decisionNote ?? undefined,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
+          })),
+        );
+      }
+    } catch {
+      /* optional */
+    }
+
+    try {
+      for (const [pid, logs] of groupByProject(await this.prisma.rejectionLog.findMany())) {
+        this.mem.rejectionLogs.set(
+          pid,
+          logs.map((l) => ({
+            id: l.id,
+            projectId: l.projectId,
+            title: l.title,
+            description: l.description ?? undefined,
+            category: l.category as ManualRejectionCategory,
+            rejectedAt: l.rejectedAt,
+            decisionNote: l.decisionNote ?? undefined,
+            impactScheduleDays: l.impactScheduleDays ?? undefined,
+            impactCost: l.impactCost ?? undefined,
+            taskId: l.taskId ?? undefined,
+            createdAt: l.createdAt.toISOString(),
+            updatedAt: l.updatedAt.toISOString(),
+          })),
+        );
+      }
+    } catch {
+      /* optional */
+    }
+
+    this.mem.loadFromSeedData(data);
+
+    for (const p of data.projects) {
+      if (!this.mem.customColumns.has(p.id)) this.mem.customColumns.set(p.id, []);
+      if (!this.mem.sprints.has(p.id)) this.mem.sprints.set(p.id, []);
+      if (!this.mem.cycles.has(p.id)) this.mem.cycles.set(p.id, []);
+      if (!this.mem.projectForms.has(p.id)) this.mem.projectForms.set(p.id, []);
+      if (!this.mem.savedViews.has(p.id)) this.mem.savedViews.set(p.id, []);
+      if (!this.mem.automationRules.has(p.id)) this.mem.automationRules.set(p.id, []);
+      if (!this.mem.activityLogs.has(p.id)) this.mem.activityLogs.set(p.id, []);
+      if (!this.mem.projectMessages.has(p.id)) this.mem.projectMessages.set(p.id, []);
+      if (!this.mem.wikiPages.has(p.id)) this.mem.wikiPages.set(p.id, []);
+      if (!this.mem.projectGuests.has(p.id)) this.mem.projectGuests.set(p.id, []);
+      if (!this.mem.customReports.has(p.id)) this.mem.customReports.set(p.id, []);
+      if (!this.mem.webhookSubscriptions.has(p.id)) this.mem.webhookSubscriptions.set(p.id, []);
+      if (!this.mem.goals.has(p.id)) this.mem.goals.set(p.id, []);
+      if (!this.mem.keyResults.has(p.id)) this.mem.keyResults.set(p.id, []);
+      if (!this.mem.whiteboardItems.has(p.id)) this.mem.whiteboardItems.set(p.id, []);
+      if (!this.mem.projectIntegrations.has(p.id)) {
+        this.mem.projectIntegrations.set(p.id, { projectId: p.id });
+      }
+    }
+
+    const sheets = await this.prisma.timesheetEntry.findMany();
+    this.mem.timesheets = sheets.map((e) => ({
+      id: e.id,
+      projectId: e.projectId,
+      userId: e.userId,
+      taskId: e.taskId,
+      date: e.date,
+      hours: e.hours,
+      status: e.status as TimesheetEntry["status"],
+      notes: e.notes ?? undefined,
+    }));
+    const notifs = await this.prisma.notification.findMany();
+    this.mem.notifications = notifs.map((n) => ({
+      id: n.id,
+      userId: n.userId,
+      type: n.type as Notification["type"],
+      title: n.title,
+      body: n.body,
+      read: n.read,
+      createdAt: n.createdAt.toISOString(),
+      metadata: (n.metadata as Record<string, string>) ?? undefined,
+    }));
+
+    this.logger.warn("DataStore: lite hydrate complete (Vercel)");
   }
 
   private async hydrateFromDatabase() {

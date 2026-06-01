@@ -21,6 +21,9 @@
 | `USE_EMBEDDED_MONGO` | `false` | מומלץ |
 | `BOOTSTRAP_ADMIN_EMAIL` | `admin@nexus.local` | אופציונלי |
 | `BOOTSTRAP_ADMIN_PASSWORD` | `admin1234` | אופציונלי |
+| `FORCE_DB_ON_VERCEL` | `true` | רק אם חייבים לכפות חיבור DB (בדרך כלל לא נדרש) |
+
+> **חשוב:** `DATABASE_URL` חייב להיות `mongodb+srv://...` (Atlas). כתובת `localhost` מה-build **לא** משמשת ב-runtime — בלי Atlas האפליקציה רצה ב-in-memory (מהיר, ללא שמירה בין cold starts).
 
 > ב-Atlas: Network Access → Allow `0.0.0.0/0` (או IP של Vercel), ו-Database User עם הרשאות read/write.
 

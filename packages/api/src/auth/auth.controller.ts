@@ -48,6 +48,12 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  @Get("health")
+  health() {
+    return { ok: true, ts: Date.now() };
+  }
+
+  @Public()
   @Post("register")
   register(@Body() body: RegisterDto) {
     return this.auth.register(body);

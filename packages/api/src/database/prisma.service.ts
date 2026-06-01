@@ -1,7 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 
-const DB_CONNECT_TIMEOUT_MS = process.env.VERCEL ? 3500 : 7000;
+const DB_CONNECT_TIMEOUT_MS = process.env.VERCEL ? 2500 : 7000;
+
+function isHostedMongoUrl(url: string): boolean {
+  return url.includes("mongodb+srv://") || url.includes("mongodb.net");
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -31,12 +35,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     if (!url) return;
     const isBuildStub =
       url.includes("127.0.0.1") || url.includes("localhost") || url.includes("nexus_build");
-    if (process.env.VERCEL && process.env.FORCE_DB_ON_VERCEL !== "true") {
-      if (isBuildStub) {
-        this.logger.warn("Skipping build-time DATABASE_URL on Vercel — in-memory API mode.");
+    if (process.env.VERCEL) {
+      if (isBuildStub || !isHostedMongoUrl(url)) {
+        this.logger.warn("Skipping DATABASE_URL on Vercel — in-memory API mode (set Atlas mongodb+srv URL to persist).");
         return;
       }
-      // Atlas / hosted Mongo on Vercel: connect when a real URL is configured.
     }
     try {
       await withTimeout(this.$connect(), DB_CONNECT_TIMEOUT_MS, "Prisma connect");
