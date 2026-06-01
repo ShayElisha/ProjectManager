@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "NexusProject — Advanced project management (MS Project Premium class)",
+  "dependencies": {
+    "@nexus/api": "workspace:*"
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
