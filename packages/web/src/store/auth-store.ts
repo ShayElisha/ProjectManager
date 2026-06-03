@@ -59,6 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   login: async (email, password, totpCode) => {
+    setAccessToken(null);
     try {
       const res = await api.login(email, password, totpCode);
       if (res.requiresTotp) {

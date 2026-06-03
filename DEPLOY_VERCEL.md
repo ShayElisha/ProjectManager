@@ -113,8 +113,10 @@ packages/api/dist    → NestJS (serverless-http)
 **פתרון (CLI, אחרי `vercel login`):**
 
 ```bash
-node scripts/vercel-disable-sso-protection.mjs core-pilote
+node scripts/vercel-disable-deployment-protection.mjs core-pilote
 ```
+
+(מכבה SSO, Password Protection ו-Trusted IPs על הפרויקט.)
 
 ## הערות
 

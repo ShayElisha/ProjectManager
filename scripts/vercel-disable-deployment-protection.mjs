@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Disables Vercel Authentication (SSO) on a project so preview URLs are public.
- * Requires: vercel login (token in ~/Library/Application Support/com.vercel.cli/auth.json on macOS)
+ * Disables all Vercel Deployment Protection on a project (SSO, password, trusted IPs).
+ * Requires: vercel login
  *
  * Usage:
- *   node scripts/vercel-disable-sso-protection.mjs [projectName]
+ *   node scripts/vercel-disable-deployment-protection.mjs [projectName]
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -37,6 +37,12 @@ if (!token) {
   process.exit(1);
 }
 
+const patch = {
+  ssoProtection: null,
+  passwordProtection: null,
+  trustedIps: null,
+};
+
 const url = `https://api.vercel.com/v9/projects/${encodeURIComponent(projectName)}?teamId=${teamId}`;
 const res = await fetch(url, {
   method: "PATCH",
@@ -44,11 +50,7 @@ const res = await fetch(url, {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   },
-  body: JSON.stringify({
-    ssoProtection: null,
-    passwordProtection: null,
-    trustedIps: null,
-  }),
+  body: JSON.stringify(patch),
 });
 
 const body = await res.json();

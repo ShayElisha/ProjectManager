@@ -7,8 +7,10 @@ import "./index.css";
 
 const i18n = initI18n("he");
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+if ("serviceWorker" in navigator) {
+  void navigator.serviceWorker.getRegistrations().then((regs) => {
+    for (const r of regs) void r.unregister();
+  });
 }
 
 createRoot(document.getElementById("root")!).render(

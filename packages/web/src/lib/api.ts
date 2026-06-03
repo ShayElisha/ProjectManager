@@ -43,13 +43,20 @@ import { getAccessToken } from "@/lib/auth-token";
 
 const BASE = "/api";
 
-function authHeaders(extra?: HeadersInit): HeadersInit {
-  const token = getAccessToken();
+const PUBLIC_AUTH_PATHS = new Set(["/auth/login", "/auth/register"]);
+
+function authHeaders(extra?: HeadersInit, opts?: { public?: boolean }): HeadersInit {
+  const token = opts?.public ? null : getAccessToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extra,
   };
+}
+
+function headersFor(path: string, extra?: HeadersInit): HeadersInit {
+  const publicRoute = PUBLIC_AUTH_PATHS.has(path.split("?")[0] ?? path);
+  return authHeaders(extra, { public: publicRoute });
 }
 
 async function downloadBlob(path: string, filename: string): Promise<void> {
@@ -67,7 +74,7 @@ async function downloadBlob(path: string, filename: string): Promise<void> {
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     ...init,
-    headers: authHeaders(init?.headers as HeadersInit),
+    headers: headersFor(url, init?.headers as HeadersInit),
   });
   if (!res.ok) {
     const text = await res.text();

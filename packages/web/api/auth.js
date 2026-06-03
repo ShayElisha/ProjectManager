@@ -300,10 +300,17 @@ async function handleProjectById(payload, projectId) {
   return { status: 200, body: mapProject(doc) };
 }
 
+function isPublicAuthPath(path) {
+  return path.endsWith("/auth/login") || path.endsWith("/auth/register");
+}
+
 async function handleLiteGet(req) {
+  const path = pathOnly(req.url);
+  if (isPublicAuthPath(path)) {
+    return { status: 405, body: { statusCode: 405, message: "Method Not Allowed" } };
+  }
   const payload = verifyBearer(req);
   if (!payload) return { status: 401, body: { statusCode: 401, message: "Unauthorized" } };
-  const path = pathOnly(req.url);
   if (path.endsWith("/auth/me")) return handleMe(payload);
   if (path.endsWith("/organizations")) return handleOrganizations(payload);
   if (path === "/api/projects" || path.endsWith("/projects")) return handleProjects(payload, req.url);
