@@ -34,7 +34,8 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => cached);
-      return cached ?? network;
+      const result = cached ?? network;
+      return Promise.resolve(result).then((r) => r || Response.error());
     }),
   );
 });

@@ -104,6 +104,18 @@ packages/api/dist    → NestJS (serverless-http)
 
 אפשר גם **הרשמה** (`/register`) — המשתמש נשמר ב-`DATABASE_URL` (Atlas). בלי MongoDB תקין, הנתונים עלולים להימחק ב-cold start (מצב in-memory).
 
+## Preview מחזיר 401 (`manifest.webmanifest`, `api/auth/login`)
+
+אם כתובת מסוג `*-git-main-*.vercel.app` מחזירה **401 Authentication Required** (עם cookie `_vercel_sso_nonce`) — זו **Vercel Deployment Protection**, לא באג באפליקציה. Production (`core-pilote.vercel.app`) עלול לעבוד בזמן שה-Preview חסום.
+
+**פתרון (Dashboard):** Project → **Settings → Deployment Protection** → כבה Vercel Authentication, או בחר **Standard** / **None** לפי הצורך.
+
+**פתרון (CLI, אחרי `vercel login`):**
+
+```bash
+node scripts/vercel-disable-sso-protection.mjs core-pilote
+```
+
 ## הערות
 
 - **WebSocket (עדכונים בזמן אמת)** — לא נתמך ב-Vercel Serverless; האפליקציה עובדת ב-REST. רענון ידני / מעבר בין מסכים יטען נתונים מחדש.

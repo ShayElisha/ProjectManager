@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+/**
+ * Disables Vercel Authentication (SSO) on a project so preview URLs are public.
+ * Requires: vercel login (token in ~/Library/Application Support/com.vercel.cli/auth.json on macOS)
+ *
+ * Usage:
+ *   node scripts/vercel-disable-sso-protection.mjs [projectName]
+ */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const projectName = process.argv[2] || "core-pilote";
+const teamId =
+  process.env.VERCEL_TEAM_ID || "team_HjXIodOdqSakV7JkdZEfIlep";
+
+const authPaths = [
+  join(homedir(), "Library/Application Support/com.vercel.cli/auth.json"),
+  join(homedir(), ".local/share/com.vercel.cli/auth.json"),
+  join(homedir(), ".config/com.vercel.cli/auth.json"),
+];
+
+let token = process.env.VERCEL_TOKEN || "";
+if (!token) {
+  for (const p of authPaths) {
+    try {
+      token = JSON.parse(readFileSync(p, "utf8")).token || "";
+      if (token) break;
+    } catch {
+      /* try next */
+    }
+  }
+}
+
+if (!token) {
+  console.error("No Vercel token. Run: vercel login");
+  process.exit(1);
+}
+
+const url = `https://api.vercel.com/v9/projects/${encodeURIComponent(projectName)}?teamId=${teamId}`;
+const res = await fetch(url, {
+  method: "PATCH",
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ ssoProtection: null }),
+});
+
+const body = await res.json();
+if (!res.ok) {
+  console.error(body);
+  process.exit(1);
+}
+
+console.log(`OK: ${body.name} — ssoProtection:`, body.ssoProtection);
