@@ -17,14 +17,25 @@
       "maxDuration": 10,
       "memory": 128
     },
+    "api/auth.js": {
+      "maxDuration": 15,
+      "memory": 256,
+      "includeFiles": "api/auth-lite/**"
+    },
     "api/index.js": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "memory": 1024,
       "includeFiles": "api/runtime/**"
     }
   },
   "rewrites": [
     { "source": "/api/auth/health", "destination": "/api/health.js" },
+    { "source": "/api/auth/login", "destination": "/api/auth.js" },
+    { "source": "/api/auth/register", "destination": "/api/auth.js" },
+    { "source": "/api/auth/me", "destination": "/api/auth.js" },
+    { "source": "/api/organizations", "destination": "/api/auth.js" },
+    { "source": "/api/projects", "destination": "/api/auth.js" },
+    { "source": "/api/projects/:id", "destination": "/api/auth.js" },
     { "source": "/api", "destination": "/api/index.js" },
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

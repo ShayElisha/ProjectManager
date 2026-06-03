@@ -1,7 +1,7 @@
 generator client {
   provider      = "prisma-client-js"
-  // Vercel runs Linux (rhel). Local dev on macOS still uses the same engine via Prisma fetch.
-  binaryTargets = ["rhel-openssl-3.0.x"]
+  // native: local dev + vercel-prepare copy; rhel: Vercel serverless Linux.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

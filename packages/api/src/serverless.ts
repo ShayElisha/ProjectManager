@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import type { NextFunction, Request, Response } from "express";
 import serverless from "serverless-http";
 import { createNestApplication } from "./bootstrap";
@@ -73,6 +74,6 @@ export default async function handler(req: unknown, res: unknown) {
 }
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
   memory: 1024,
 };

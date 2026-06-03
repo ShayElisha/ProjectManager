@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+data
+src
+prisma/dev.db
+nest-cli.json
+tsconfig.json

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 import type {
@@ -39,7 +39,8 @@ import type {
 } from "@nexus/shared";
 import type { StoredUserRecord } from "./in-memory.backend";
 import { riskScore as calcRiskScore } from "@nexus/shared";
-import { PrismaService } from "./prisma.service";
+import type { PrismaClient } from "@prisma/client";
+import { PRISMA, type PrismaConnectFacade } from "./prisma.token";
 import { InMemoryBackend } from "./in-memory.backend";
 import { buildSeedData } from "./seed-data";
 
@@ -285,17 +286,20 @@ export class DataStoreService implements OnApplicationBootstrap {
   private readonly logger = new Logger(DataStoreService.name);
   readonly mem = new InMemoryBackend();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PRISMA) private readonly prisma: PrismaConnectFacade & PrismaClient) {}
 
   get useDb(): boolean {
     return this.prisma.enabled;
   }
 
+  private get db(): PrismaClient {
+    return this.prisma as PrismaClient;
+  }
+
   async onApplicationBootstrap() {
     if (process.env.VERCEL) {
-      this.mem.seed();
       await this.ensureBootstrapAdminUser();
-      this.logger.warn("DataStore: Vercel fast bootstrap (in-memory; Atlas loads on demand)");
+      this.logger.warn("DataStore: Vercel fast bootstrap (in-memory login; set DATABASE_URL + Atlas IP allowlist for persistence)");
       return;
     }
 
@@ -309,7 +313,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     try {
       await withTimeout(
         (async () => {
-          const count = await this.prisma.project.count();
+          const count = await this.db.project.count();
           if (count === 0) {
             await this.seedDatabase();
             this.logger.log("DataStore: empty organization ready (no demo projects)");
@@ -352,7 +356,7 @@ export class DataStoreService implements OnApplicationBootstrap {
 
   private async seedDatabase() {
     const data = buildSeedData();
-    await this.prisma.organization.create({
+    await this.db.organization.create({
       data: {
         id: data.organizationId,
         name: data.organizationName,
@@ -362,22 +366,22 @@ export class DataStoreService implements OnApplicationBootstrap {
     });
 
     for (const resource of data.resources) {
-      await this.prisma.resource.create({ data: resource });
+      await this.db.resource.create({ data: resource });
     }
 
     for (const project of data.projects) {
-      await this.prisma.project.create({ data: prismaProjectData(project) });
+      await this.db.project.create({ data: prismaProjectData(project) });
       const tasks = data.tasks.get(project.id) ?? [];
       if (tasks.length) {
-        await this.prisma.task.createMany({ data: tasks.map(taskToPrismaCreate) });
+        await this.db.task.createMany({ data: tasks.map(taskToPrismaCreate) });
       }
       const deps = data.dependencies.get(project.id) ?? [];
       if (deps.length) {
-        await this.prisma.taskDependency.createMany({ data: deps });
+        await this.db.taskDependency.createMany({ data: deps });
       }
       const assigns = data.assignments.get(project.id) ?? [];
       for (const a of assigns) {
-        await this.prisma.resourceAssignment.create({
+        await this.db.resourceAssignment.create({
           data: { ...a, projectId: project.id },
         });
       }
@@ -386,7 +390,7 @@ export class DataStoreService implements OnApplicationBootstrap {
 
   /** Vercel: batch queries only — avoids N+1 per project (prevents 60s+ cold start). */
   private async hydrateLiteFromDatabase(): Promise<void> {
-    const orgs = await this.prisma.organization.findMany();
+    const orgs = await this.db.organization.findMany();
     const org = orgs[0];
     if (!org) return;
 
@@ -400,7 +404,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
 
     try {
-      const dbUsers = await this.prisma.user.findMany();
+      const dbUsers = await this.db.user.findMany();
       for (const u of dbUsers) {
         this.mem.users.set(u.id, {
           id: u.id,
@@ -426,7 +430,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     data.dependencies = new Map();
     data.assignments = new Map();
 
-    const rawResources = await this.prisma.resource.findMany({ where: { organizationId: org.id } });
+    const rawResources = await this.db.resource.findMany({ where: { organizationId: org.id } });
     data.resources = rawResources.map((r) => ({
       ...r,
       type: r.type as Resource["type"],
@@ -436,7 +440,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       calendarId: r.calendarId ?? undefined,
     }));
 
-    const projects = await this.prisma.project.findMany();
+    const projects = await this.db.project.findMany();
     for (const p of projects) {
       data.projects.push({
         id: p.id,
@@ -468,7 +472,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       return m;
     };
 
-    for (const l of await this.prisma.budgetLineItem.findMany()) {
+    for (const l of await this.db.budgetLineItem.findMany()) {
       if (!projectIds.has(l.projectId)) continue;
       const lines = this.mem.budgetLines.get(l.projectId) ?? [];
       lines.push({
@@ -488,21 +492,21 @@ export class DataStoreService implements OnApplicationBootstrap {
       this.mem.budgetLines.set(l.projectId, lines);
     }
 
-    for (const t of await this.prisma.task.findMany({ orderBy: { sortOrder: "asc" } })) {
+    for (const t of await this.db.task.findMany({ orderBy: { sortOrder: "asc" } })) {
       const list = data.tasks.get(t.projectId) ?? [];
       list.push(mapTask(t));
       data.tasks.set(t.projectId, list);
     }
 
-    for (const [pid, deps] of groupByProject(await this.prisma.taskDependency.findMany())) {
+    for (const [pid, deps] of groupByProject(await this.db.taskDependency.findMany())) {
       data.dependencies.set(pid, deps.map((d) => ({ ...d, type: d.type as TaskDependency["type"] })));
     }
 
-    for (const [pid, rows] of groupByProject(await this.prisma.resourceAssignment.findMany())) {
+    for (const [pid, rows] of groupByProject(await this.db.resourceAssignment.findMany())) {
       data.assignments.set(pid, rows);
     }
 
-    for (const b of await this.prisma.baseline.findMany()) {
+    for (const b of await this.db.baseline.findMany()) {
       if (!projectIds.has(b.projectId)) continue;
       const list = this.mem.baselines.get(b.projectId) ?? [];
       list.push({
@@ -516,7 +520,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       this.mem.baselines.set(b.projectId, list);
     }
 
-    for (const [pid, members] of groupByProject(await this.prisma.projectMember.findMany())) {
+    for (const [pid, members] of groupByProject(await this.db.projectMember.findMany())) {
       this.mem.projectMembers.set(
         pid,
         members.map((m) => ({
@@ -530,7 +534,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
 
     try {
-      for (const [pid, risks] of groupByProject(await this.prisma.projectRisk.findMany())) {
+      for (const [pid, risks] of groupByProject(await this.db.projectRisk.findMany())) {
         this.mem.risks.set(pid, risks.map((r) => mapPrismaRisk(r)));
       }
     } catch {
@@ -538,7 +542,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
 
     try {
-      for (const [pid, changes] of groupByProject(await this.prisma.changeRequest.findMany())) {
+      for (const [pid, changes] of groupByProject(await this.db.changeRequest.findMany())) {
         this.mem.changeRequests.set(
           pid,
           changes.map((c) => ({
@@ -562,7 +566,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
 
     try {
-      for (const [pid, logs] of groupByProject(await this.prisma.rejectionLog.findMany())) {
+      for (const [pid, logs] of groupByProject(await this.db.rejectionLog.findMany())) {
         this.mem.rejectionLogs.set(
           pid,
           logs.map((l) => ({
@@ -608,7 +612,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       }
     }
 
-    const sheets = await this.prisma.timesheetEntry.findMany();
+    const sheets = await this.db.timesheetEntry.findMany();
     this.mem.timesheets = sheets.map((e) => ({
       id: e.id,
       projectId: e.projectId,
@@ -619,7 +623,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       status: e.status as TimesheetEntry["status"],
       notes: e.notes ?? undefined,
     }));
-    const notifs = await this.prisma.notification.findMany();
+    const notifs = await this.db.notification.findMany();
     this.mem.notifications = notifs.map((n) => ({
       id: n.id,
       userId: n.userId,
@@ -635,7 +639,7 @@ export class DataStoreService implements OnApplicationBootstrap {
   }
 
   private async hydrateFromDatabase() {
-    const orgs = await this.prisma.organization.findMany();
+    const orgs = await this.db.organization.findMany();
     const org = orgs[0];
     if (!org) return;
 
@@ -649,7 +653,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
 
     try {
-      const dbUsers = await this.prisma.user.findMany();
+      const dbUsers = await this.db.user.findMany();
       for (const u of dbUsers) {
         this.mem.users.set(u.id, {
           id: u.id,
@@ -673,7 +677,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     data.projects = [];
     data.tasks = new Map();
     data.dependencies = new Map();
-    const rawResources = await this.prisma.resource.findMany({ where: { organizationId: org.id } });
+    const rawResources = await this.db.resource.findMany({ where: { organizationId: org.id } });
     data.resources = rawResources.map((r) => ({
       ...r,
       type: r.type as Resource["type"],
@@ -684,7 +688,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }));
     data.assignments = new Map();
 
-    const projects = await this.prisma.project.findMany();
+    const projects = await this.db.project.findMany();
     for (const p of projects) {
       data.projects.push({
         id: p.id,
@@ -702,7 +706,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       });
-      const lines = await this.prisma.budgetLineItem.findMany({ where: { projectId: p.id } });
+      const lines = await this.db.budgetLineItem.findMany({ where: { projectId: p.id } });
       this.mem.budgetLines.set(
         p.id,
         lines.map((l) => ({
@@ -720,21 +724,21 @@ export class DataStoreService implements OnApplicationBootstrap {
           sourceRef: l.sourceRef ?? undefined,
         })),
       );
-      const tasks = await this.prisma.task.findMany({
+      const tasks = await this.db.task.findMany({
         where: { projectId: p.id },
         orderBy: { sortOrder: "asc" },
       });
       data.tasks.set(p.id, tasks.map(mapTask));
-      const deps = await this.prisma.taskDependency.findMany({ where: { projectId: p.id } });
+      const deps = await this.db.taskDependency.findMany({ where: { projectId: p.id } });
       data.dependencies.set(
         p.id,
         deps.map((d) => ({ ...d, type: d.type as TaskDependency["type"] })),
       );
       data.assignments.set(
         p.id,
-        await this.prisma.resourceAssignment.findMany({ where: { projectId: p.id } }),
+        await this.db.resourceAssignment.findMany({ where: { projectId: p.id } }),
       );
-      const baselines = await this.prisma.baseline.findMany({ where: { projectId: p.id } });
+      const baselines = await this.db.baseline.findMany({ where: { projectId: p.id } });
       this.mem.baselines.set(
         p.id,
         baselines.map((b) => ({
@@ -746,7 +750,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           tasks: b.tasks as Baseline["tasks"],
         })),
       );
-      const members = await this.prisma.projectMember.findMany({ where: { projectId: p.id } });
+      const members = await this.db.projectMember.findMany({ where: { projectId: p.id } });
       this.mem.projectMembers.set(
         p.id,
         members.map((m) => ({
@@ -758,7 +762,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         })),
       );
       try {
-        const risks = await this.prisma.projectRisk.findMany({ where: { projectId: p.id } });
+        const risks = await this.db.projectRisk.findMany({ where: { projectId: p.id } });
         this.mem.risks.set(
           p.id,
           risks.map((r) => mapPrismaRisk(r)),
@@ -767,7 +771,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         if (!this.mem.risks.has(p.id)) this.mem.risks.set(p.id, []);
       }
       try {
-        const changes = await this.prisma.changeRequest.findMany({ where: { projectId: p.id } });
+        const changes = await this.db.changeRequest.findMany({ where: { projectId: p.id } });
         this.mem.changeRequests.set(
           p.id,
           changes.map((c) => ({
@@ -789,7 +793,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         if (!this.mem.changeRequests.has(p.id)) this.mem.changeRequests.set(p.id, []);
       }
       try {
-        const logs = await this.prisma.rejectionLog.findMany({ where: { projectId: p.id } });
+        const logs = await this.db.rejectionLog.findMany({ where: { projectId: p.id } });
         this.mem.rejectionLogs.set(
           p.id,
           logs.map((l) => ({
@@ -816,7 +820,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     await this.hydrateEnterpriseFromDb(org.id);
 
     this.mem.loadFromSeedData(data);
-    const sheets = await this.prisma.timesheetEntry.findMany();
+    const sheets = await this.db.timesheetEntry.findMany();
     this.mem.timesheets = sheets.map((e) => ({
       id: e.id,
       projectId: e.projectId,
@@ -827,7 +831,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       status: e.status as TimesheetEntry["status"],
       notes: e.notes ?? undefined,
     }));
-    const notifs = await this.prisma.notification.findMany();
+    const notifs = await this.db.notification.findMany();
     this.mem.notifications = notifs.map((n) => ({
       id: n.id,
       userId: n.userId,
@@ -842,7 +846,7 @@ export class DataStoreService implements OnApplicationBootstrap {
 
   private async hydrateProjectFeatures(projectId: string): Promise<void> {
     try {
-      const comments = await this.prisma.taskComment.findMany({ where: { projectId } });
+      const comments = await this.db.taskComment.findMany({ where: { projectId } });
       for (const c of comments) {
         if (!this.mem.taskComments.some((x) => x.id === c.id)) {
           this.mem.taskComments.push({
@@ -856,7 +860,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           });
         }
       }
-      const attachments = await this.prisma.taskAttachment.findMany({ where: { projectId } });
+      const attachments = await this.db.taskAttachment.findMany({ where: { projectId } });
       for (const a of attachments) {
         if (!this.mem.taskAttachments.some((x) => x.id === a.id)) {
           this.mem.taskAttachments.push({
@@ -872,7 +876,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           });
         }
       }
-      const savedViews = await this.prisma.savedView.findMany({ where: { projectId } });
+      const savedViews = await this.db.savedView.findMany({ where: { projectId } });
       this.mem.savedViews.set(
         projectId,
         savedViews.map((v) => ({
@@ -885,7 +889,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           columns: (v.columns as SavedView["columns"]) ?? undefined,
         })),
       );
-      const rules = await this.prisma.automationRule.findMany({ where: { projectId } });
+      const rules = await this.db.automationRule.findMany({ where: { projectId } });
       this.mem.automationRules.set(
         projectId,
         rules.map((r) => ({
@@ -900,7 +904,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           actionPayload: r.actionPayload as AutomationRule["actionPayload"],
         })),
       );
-      const logs = await this.prisma.activityLog.findMany({
+      const logs = await this.db.activityLog.findMany({
         where: { projectId },
         orderBy: { createdAt: "desc" },
         take: 200,
@@ -919,7 +923,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           createdAt: l.createdAt.toISOString(),
         })),
       );
-      const messages = await this.prisma.projectMessage.findMany({ where: { projectId } });
+      const messages = await this.db.projectMessage.findMany({ where: { projectId } });
       this.mem.projectMessages.set(
         projectId,
         messages.map((m) => ({
@@ -931,7 +935,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           createdAt: m.createdAt.toISOString(),
         })),
       );
-      const wiki = await this.prisma.projectWikiPage.findMany({ where: { projectId } });
+      const wiki = await this.db.projectWikiPage.findMany({ where: { projectId } });
       this.mem.wikiPages.set(
         projectId,
         wiki.map((w) => ({
@@ -942,7 +946,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           updatedAt: w.updatedAt.toISOString(),
         })),
       );
-      const guests = await this.prisma.projectGuest.findMany({ where: { projectId } });
+      const guests = await this.db.projectGuest.findMany({ where: { projectId } });
       this.mem.projectGuests.set(
         projectId,
         guests.map((g) => ({
@@ -955,7 +959,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           createdAt: g.createdAt.toISOString(),
         })),
       );
-      const reports = await this.prisma.customReport.findMany({ where: { projectId } });
+      const reports = await this.db.customReport.findMany({ where: { projectId } });
       this.mem.customReports.set(
         projectId,
         reports.map((r) => ({
@@ -966,7 +970,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           createdAt: r.createdAt.toISOString(),
         })),
       );
-      const hooks = await this.prisma.webhookSubscription.findMany({ where: { projectId } });
+      const hooks = await this.db.webhookSubscription.findMany({ where: { projectId } });
       this.mem.webhookSubscriptions.set(
         projectId,
         hooks.map((h) => ({
@@ -978,7 +982,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           enabled: h.enabled,
         })),
       );
-      const goals = await this.prisma.goal.findMany({ where: { projectId } });
+      const goals = await this.db.goal.findMany({ where: { projectId } });
       this.mem.goals.set(
         projectId,
         goals.map((g) => ({
@@ -989,7 +993,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           progress: g.progress,
         })),
       );
-      const krs = await this.prisma.keyResult.findMany({ where: { projectId } });
+      const krs = await this.db.keyResult.findMany({ where: { projectId } });
       this.mem.keyResults.set(
         projectId,
         krs.map((k) => ({
@@ -1002,7 +1006,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           unit: k.unit ?? undefined,
         })),
       );
-      const wb = await this.prisma.whiteboardItem.findMany({ where: { projectId } });
+      const wb = await this.db.whiteboardItem.findMany({ where: { projectId } });
       this.mem.whiteboardItems.set(
         projectId,
         wb.map((w) => ({
@@ -1023,7 +1027,7 @@ export class DataStoreService implements OnApplicationBootstrap {
 
   private async hydrateEnterpriseFromDb(organizationId: string): Promise<void> {
     try {
-      const audits = await this.prisma.auditLog.findMany({
+      const audits = await this.db.auditLog.findMany({
         where: { organizationId },
         orderBy: { createdAt: "desc" },
         take: 500,
@@ -1040,7 +1044,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         metadata: (a.metadata as Record<string, unknown>) ?? undefined,
         createdAt: a.createdAt.toISOString(),
       }));
-      const programs = await this.prisma.program.findMany({ where: { organizationId } });
+      const programs = await this.db.program.findMany({ where: { organizationId } });
       this.mem.programs = programs.map((p) => ({
         id: p.id,
         organizationId: p.organizationId,
@@ -1050,7 +1054,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         startDate: p.startDate ?? undefined,
         endDate: p.endDate ?? undefined,
       }));
-      const invoices = await this.prisma.invoice.findMany({ where: { organizationId } });
+      const invoices = await this.db.invoice.findMany({ where: { organizationId } });
       this.mem.invoices = invoices.map((i) => ({
         id: i.id,
         organizationId: i.organizationId,
@@ -1064,9 +1068,9 @@ export class DataStoreService implements OnApplicationBootstrap {
         dueDate: i.dueDate ?? undefined,
         createdAt: i.createdAt.toISOString(),
       }));
-      const contacts = await this.prisma.crmContact.findMany({ where: { organizationId } });
+      const contacts = await this.db.crmContact.findMany({ where: { organizationId } });
       this.mem.crmContacts = contacts.map((c) => ({ ...c, email: c.email ?? undefined, company: c.company ?? undefined, phone: c.phone ?? undefined }));
-      const deals = await this.prisma.crmDeal.findMany({ where: { organizationId } });
+      const deals = await this.db.crmDeal.findMany({ where: { organizationId } });
       this.mem.crmDeals = deals.map((d) => ({
         id: d.id,
         organizationId: d.organizationId,
@@ -1076,7 +1080,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         stage: d.stage as import("@nexus/shared").CrmDeal["stage"],
         projectId: d.projectId ?? undefined,
       }));
-      const orgRules = await this.prisma.orgAutomationRule.findMany({ where: { organizationId } });
+      const orgRules = await this.db.orgAutomationRule.findMany({ where: { organizationId } });
       this.mem.orgAutomationRules = orgRules.map((r) => ({
         id: r.id,
         organizationId: r.organizationId,
@@ -1086,7 +1090,7 @@ export class DataStoreService implements OnApplicationBootstrap {
         actionType: r.actionType as import("@nexus/shared").OrgAutomationRule["actionType"],
         actionPayload: r.actionPayload as Record<string, unknown> | undefined,
       }));
-      const proofs = await this.prisma.proofAsset.findMany();
+      const proofs = await this.db.proofAsset.findMany();
       this.mem.proofAssets = proofs
         .filter((p) => {
           const proj = this.mem.projects.get(p.projectId);
@@ -1102,7 +1106,7 @@ export class DataStoreService implements OnApplicationBootstrap {
           reviewerNote: p.reviewerNote ?? undefined,
           createdAt: p.createdAt.toISOString(),
         }));
-      const perms = await this.prisma.taskPermission.findMany();
+      const perms = await this.db.taskPermission.findMany();
       this.mem.taskPermissions = perms.map((p) => ({
         id: p.id,
         projectId: p.projectId,
@@ -1117,7 +1121,7 @@ export class DataStoreService implements OnApplicationBootstrap {
 
   private async persistTask(task: Task) {
     if (!this.useDb) return;
-    await this.prisma.task.upsert({
+    await this.db.task.upsert({
       where: { id: task.id },
       create: taskToPrismaCreate(task),
       update: taskToPrismaUpdate(task),
@@ -1130,13 +1134,13 @@ export class DataStoreService implements OnApplicationBootstrap {
   private async persistTasks(projectId: string, tasks: Task[]) {
     if (!this.useDb) return;
     const incomingIds = new Set(tasks.map((t) => t.id));
-    const existing = await this.prisma.task.findMany({
+    const existing = await this.db.task.findMany({
       where: { projectId },
       select: { id: true },
     });
     const orphanIds = existing.map((e) => e.id).filter((id) => !incomingIds.has(id));
     if (orphanIds.length) {
-      await this.prisma.task.deleteMany({ where: { id: { in: orphanIds } } });
+      await this.db.task.deleteMany({ where: { id: { in: orphanIds } } });
     }
     for (const task of tasks) {
       await this.persistTask(task);
@@ -1221,7 +1225,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     this.mem.organizations.set(org.id, org);
     if (this.useDb) {
-      await this.prisma.organization.create({
+      await this.db.organization.create({
         data: {
           id: org.id,
           name: org.name,
@@ -1243,7 +1247,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.organizations.set(id, updated);
     if (id === this.mem.organizationId) this.mem.organizationName = updated.name;
     if (this.useDb) {
-      void this.prisma.organization.update({
+      void this.db.organization.update({
         where: { id },
         data: {
           ...(patch.name != null ? { name: patch.name } : {}),
@@ -1351,7 +1355,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.users.set(id, record);
     this.mem.usersByEmail.set(input.email, id);
     if (this.useDb) {
-      await this.prisma.user.create({
+      await this.db.user.create({
         data: {
           id,
           email: input.email,
@@ -1390,7 +1394,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     this.mem.taskComments.push(comment);
     if (this.useDb) {
-      await this.prisma.taskComment.create({ data: { ...comment, createdAt: new Date(comment.createdAt) } });
+      await this.db.taskComment.create({ data: { ...comment, createdAt: new Date(comment.createdAt) } });
     }
     const mentions = input.body.match(/@([\w\u0590-\u05FF.-]+)/g);
     if (mentions) {
@@ -1457,7 +1461,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     this.mem.taskAttachments.push(att);
     if (this.useDb) {
-      await this.prisma.taskAttachment.create({
+      await this.db.taskAttachment.create({
         data: {
           id: att.id,
           projectId: att.projectId,
@@ -1482,7 +1486,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (idx < 0) return { deleted: false };
     this.mem.taskAttachments.splice(idx, 1);
     if (this.useDb) {
-      void this.prisma.taskAttachment.delete({ where: { id: attachmentId } });
+      void this.db.taskAttachment.delete({ where: { id: attachmentId } });
     }
     return { deleted: true };
   }
@@ -1492,7 +1496,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (!n) return { ok: false };
     n.read = true;
     if (this.useDb) {
-      void this.prisma.notification.update({ where: { id }, data: { read: true } });
+      void this.db.notification.update({ where: { id }, data: { read: true } });
     }
     return { ok: true, notification: n };
   }
@@ -1507,7 +1511,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       }
     }
     if (this.useDb && userId) {
-      void this.prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
+      void this.db.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
     }
     return { marked: count };
   }
@@ -1532,7 +1536,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     this.mem.activeTimers.push(timer);
     if (this.useDb) {
-      void this.prisma.activeTimer.create({
+      void this.db.activeTimer.create({
         data: {
           id: timer.id,
           userId,
@@ -1565,7 +1569,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     if (entry.taskId) await this.addTimesheet(entry);
     if (this.useDb) {
-      void this.prisma.activeTimer.update({
+      void this.db.activeTimer.update({
         where: { id: timer.id },
         data: { stoppedAt: new Date(timer.stoppedAt) },
       });
@@ -1699,7 +1703,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     await this.setTasks(targetProjectId, targetTasks);
 
     if (this.useDb) {
-      await this.prisma.task.deleteMany({
+      await this.db.task.deleteMany({
         where: { id: { in: [...toMoveIds] }, projectId: sourceProjectId },
       });
     }
@@ -1717,7 +1721,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(col);
     this.mem.customColumns.set(col.projectId, list);
     if (this.useDb) {
-      await this.prisma.customColumnDef.create({
+      await this.db.customColumnDef.create({
         data: {
           id: col.id,
           projectId: col.projectId,
@@ -1741,7 +1745,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(sprint);
     this.mem.sprints.set(sprint.projectId, list);
     if (this.useDb) {
-      await this.prisma.sprint.create({ data: sprint });
+      await this.db.sprint.create({ data: sprint });
     }
     return sprint;
   }
@@ -1752,7 +1756,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (idx < 0) return null;
     list[idx] = { ...list[idx]!, ...patch };
     if (this.useDb) {
-      await this.prisma.sprint.update({ where: { id: sprintId }, data: patch });
+      await this.db.sprint.update({ where: { id: sprintId }, data: patch });
     }
     return list[idx]!;
   }
@@ -1782,7 +1786,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(cycle);
     this.mem.cycles.set(cycle.projectId, list);
     if (this.useDb) {
-      await this.prisma.cycle.create({ data: cycle });
+      await this.db.cycle.create({ data: cycle });
     }
     return cycle;
   }
@@ -1805,7 +1809,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(form);
     this.mem.projectForms.set(form.projectId, list);
     if (this.useDb) {
-      await this.prisma.projectForm.create({
+      await this.db.projectForm.create({
         data: { ...form, fields: form.fields as object },
       });
     }
@@ -1824,7 +1828,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(view);
     this.mem.savedViews.set(view.projectId, list);
     if (this.useDb) {
-      await this.prisma.savedView.create({
+      await this.db.savedView.create({
         data: { ...view, filters: view.filters as object },
       });
     }
@@ -1888,14 +1892,14 @@ export class DataStoreService implements OnApplicationBootstrap {
   private async ensureOrganization(): Promise<string> {
     if (this.mem.organizationId) {
       if (!this.useDb) return this.mem.organizationId;
-      const exists = await this.prisma.organization.findUnique({
+      const exists = await this.db.organization.findUnique({
         where: { id: this.mem.organizationId },
       });
       if (exists) return this.mem.organizationId;
     }
 
     if (this.useDb) {
-      const org = await this.prisma.organization.findFirst();
+      const org = await this.db.organization.findFirst();
       if (org) {
         this.mem.organizationId = org.id;
         this.mem.organizationName = org.name;
@@ -1907,7 +1911,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.organizationId = data.organizationId;
     this.mem.organizationName = data.organizationName;
     if (this.useDb) {
-      await this.prisma.organization.create({
+      await this.db.organization.create({
         data: {
           id: data.organizationId,
           name: data.organizationName,
@@ -1969,7 +1973,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.projectIntegrations.set(project.id, { projectId: project.id });
 
     if (this.useDb) {
-      await this.prisma.project.create({ data: prismaProjectData(project) });
+      await this.db.project.create({ data: prismaProjectData(project) });
     }
     return project;
   }
@@ -1985,7 +1989,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (list.length > 500) list.length = 500;
     this.mem.activityLogs.set(entry.projectId, list);
     if (this.useDb) {
-      void this.prisma.activityLog.create({
+      void this.db.activityLog.create({
         data: { ...row, createdAt: new Date(row.createdAt) },
       });
     }
@@ -2005,7 +2009,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(rule);
     this.mem.automationRules.set(rule.projectId, list);
     if (this.useDb) {
-      await this.prisma.automationRule.create({
+      await this.db.automationRule.create({
         data: {
           ...rule,
           triggerValue: rule.triggerValue as object | undefined,
@@ -2030,7 +2034,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(row);
     this.mem.projectMessages.set(msg.projectId, list);
     if (this.useDb) {
-      await this.prisma.projectMessage.create({
+      await this.db.projectMessage.create({
         data: { ...row, createdAt: new Date(row.createdAt) },
       });
     }
@@ -2064,7 +2068,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
     this.mem.wikiPages.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.projectWikiPage.upsert({
+      await this.db.projectWikiPage.upsert({
         where: { id: page.id },
         create: { ...page, updatedAt: new Date(page.updatedAt) },
         update: { title: page.title, content: page.content, updatedAt: new Date(page.updatedAt) },
@@ -2098,7 +2102,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(guest);
     this.mem.projectGuests.set(input.projectId, list);
     if (this.useDb) {
-      await this.prisma.projectGuest.create({
+      await this.db.projectGuest.create({
         data: { ...guest, createdAt: new Date(guest.createdAt) },
       });
     }
@@ -2121,7 +2125,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(report);
     this.mem.customReports.set(input.projectId, list);
     if (this.useDb) {
-      await this.prisma.customReport.create({
+      await this.db.customReport.create({
         data: { ...report, widgets: report.widgets as object },
       });
     }
@@ -2140,7 +2144,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(hook);
     this.mem.webhookSubscriptions.set(input.projectId, list);
     if (this.useDb) {
-      await this.prisma.webhookSubscription.create({
+      await this.db.webhookSubscription.create({
         data: { ...hook, events: hook.events as object },
       });
     }
@@ -2171,7 +2175,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(goal);
     this.mem.goals.set(input.projectId, list);
     if (this.useDb) {
-      await this.prisma.goal.create({ data: goal });
+      await this.db.goal.create({ data: goal });
     }
     return goal;
   }
@@ -2193,7 +2197,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(kr);
     this.mem.keyResults.set(input.projectId, list);
     if (this.useDb) {
-      await this.prisma.keyResult.create({ data: kr });
+      await this.db.keyResult.create({ data: kr });
     }
     return kr;
   }
@@ -2209,7 +2213,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list[idx] = { ...list[idx]!, ...patch };
     this.mem.keyResults.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.keyResult.update({
+      await this.db.keyResult.update({
         where: { id: krId },
         data: {
           title: list[idx]!.title,
@@ -2261,7 +2265,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
     this.mem.whiteboardItems.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.whiteboardItem.upsert({
+      await this.db.whiteboardItem.upsert({
         where: { id: item.id },
         create: item,
         update: {
@@ -2283,7 +2287,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === list.length) return false;
     this.mem.whiteboardItems.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.whiteboardItem.delete({ where: { id: itemId } }).catch(() => undefined);
+      await this.db.whiteboardItem.delete({ where: { id: itemId } }).catch(() => undefined);
     }
     return true;
   }
@@ -2347,7 +2351,7 @@ export class DataStoreService implements OnApplicationBootstrap {
       }
     }
     if (this.useDb) {
-      void this.prisma.auditLog
+      void this.db.auditLog
         .create({
           data: {
             id: row.id,
@@ -2408,7 +2412,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const row: import("@nexus/shared").Program = { ...input, id: uuid() };
     this.mem.programs.push(row);
     if (this.useDb) {
-      void this.prisma.program
+      void this.db.program
         .create({
           data: {
             id: row.id,
@@ -2443,7 +2447,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     };
     this.mem.invoices.push(row);
     if (this.useDb) {
-      void this.prisma.invoice
+      void this.db.invoice
         .create({
           data: {
             id: row.id,
@@ -2534,7 +2538,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     u.totpSecret = secret || undefined;
     u.totpEnabled = enabled;
     if (this.useDb) {
-      void this.prisma.user.update({
+      void this.db.user.update({
         where: { id: userId },
         data: { totpSecret: secret || null, totpEnabled: enabled },
       });
@@ -2582,7 +2586,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const updated = { ...project, ...patch, updatedAt: new Date().toISOString() };
     this.mem.projects.set(projectId, updated);
     if (this.useDb) {
-      await this.prisma.project.update({
+      await this.db.project.update({
         where: { id: projectId },
         data: {
           name: updated.name,
@@ -2607,7 +2611,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(line);
     this.mem.budgetLines.set(line.projectId, list);
     if (this.useDb) {
-      await this.prisma.budgetLineItem.create({
+      await this.db.budgetLineItem.create({
         data: {
           id: line.id,
           projectId: line.projectId,
@@ -2637,7 +2641,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (idx < 0) return null;
     list[idx] = { ...list[idx], ...patch };
     if (this.useDb) {
-      await this.prisma.budgetLineItem.update({
+      await this.db.budgetLineItem.update({
         where: { id: lineId },
         data: {
           category: list[idx].category,
@@ -2666,7 +2670,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === list.length) return false;
     this.mem.budgetLines.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.budgetLineItem.deleteMany({ where: { id: lineId, projectId } });
+      await this.db.budgetLineItem.deleteMany({ where: { id: lineId, projectId } });
     }
     return true;
   }
@@ -2676,7 +2680,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const list = this.mem.resources.get(orgId) ?? [];
     list.push(resource);
     this.mem.resources.set(orgId, list);
-    if (this.useDb) await this.prisma.resource.create({ data: resource });
+    if (this.useDb) await this.db.resource.create({ data: resource });
     return resource;
   }
 
@@ -2685,7 +2689,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(member);
     this.mem.projectMembers.set(member.projectId, list);
     if (this.useDb) {
-      await this.prisma.projectMember.create({
+      await this.db.projectMember.create({
         data: {
           id: member.id,
           projectId: member.projectId,
@@ -2708,7 +2712,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (idx < 0) return null;
     list[idx] = { ...list[idx], ...patch };
     if (this.useDb) {
-      await this.prisma.projectMember.update({
+      await this.db.projectMember.update({
         where: { id: memberId },
         data: {
           ...(patch.role !== undefined && { role: patch.role }),
@@ -2746,7 +2750,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     }
     list[idx] = next;
     if (this.useDb) {
-      await this.prisma.resource.update({
+      await this.db.resource.update({
         where: { id: resourceId },
         data: {
           ...(patch.name !== undefined && { name: patch.name }),
@@ -2769,7 +2773,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(assignment);
     this.mem.assignments.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.resourceAssignment.create({
+      await this.db.resourceAssignment.create({
         data: { ...assignment, projectId },
       });
     }
@@ -2787,7 +2791,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const deps = this.mem.dependencies.get(dep.projectId) ?? [];
     deps.push(dep);
     this.mem.dependencies.set(dep.projectId, deps);
-    if (this.useDb) await this.prisma.taskDependency.create({ data: dep });
+    if (this.useDb) await this.db.taskDependency.create({ data: dep });
     return dep;
   }
 
@@ -2797,7 +2801,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === deps.length) return false;
     this.mem.dependencies.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.taskDependency.deleteMany({ where: { id: depId, projectId } });
+      await this.db.taskDependency.deleteMany({ where: { id: depId, projectId } });
     }
     return true;
   }
@@ -2807,7 +2811,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(baseline);
     this.mem.baselines.set(baseline.projectId, list);
     if (this.useDb) {
-      await this.prisma.baseline.create({
+      await this.db.baseline.create({
         data: {
           ...baseline,
           savedAt: new Date(baseline.savedAt),
@@ -2821,7 +2825,7 @@ export class DataStoreService implements OnApplicationBootstrap {
   async addTimesheet(entry: TimesheetEntry) {
     this.mem.timesheets.push(entry);
     if (this.useDb && entry.projectId) {
-      await this.prisma.timesheetEntry.create({
+      await this.db.timesheetEntry.create({
         data: {
           id: entry.id,
           projectId: entry.projectId,
@@ -2850,7 +2854,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const next = { ...this.mem.timesheets[idx]!, ...patch };
     this.mem.timesheets[idx] = next;
     if (this.useDb) {
-      await this.prisma.timesheetEntry.updateMany({
+      await this.db.timesheetEntry.updateMany({
         where: { id: entryId, projectId },
         data: {
           ...(patch.status != null ? { status: patch.status } : {}),
@@ -2865,7 +2869,7 @@ export class DataStoreService implements OnApplicationBootstrap {
   async addNotification(n: Notification) {
     this.mem.notifications.push(n);
     if (this.useDb) {
-      await this.prisma.notification.create({
+      await this.db.notification.create({
         data: {
           ...n,
           createdAt: new Date(n.createdAt),
@@ -2880,7 +2884,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     const tasks = [...(this.mem.tasks.get(projectId) ?? []), ...newTasks];
     this.mem.tasks.set(projectId, tasks);
     if (this.useDb) {
-      await this.prisma.task.createMany({ data: newTasks.map(taskToPrismaCreate) });
+      await this.db.task.createMany({ data: newTasks.map(taskToPrismaCreate) });
     }
     return tasks;
   }
@@ -2912,16 +2916,16 @@ export class DataStoreService implements OnApplicationBootstrap {
 
     const ids = [...toDelete];
     if (this.useDb && ids.length) {
-      await this.prisma.taskDependency.deleteMany({
+      await this.db.taskDependency.deleteMany({
         where: {
           projectId,
           OR: [{ predecessorId: { in: ids } }, { successorId: { in: ids } }],
         },
       });
-      await this.prisma.resourceAssignment.deleteMany({
+      await this.db.resourceAssignment.deleteMany({
         where: { projectId, taskId: { in: ids } },
       });
-      await this.prisma.task.deleteMany({ where: { id: { in: ids }, projectId } });
+      await this.db.task.deleteMany({ where: { id: { in: ids }, projectId } });
     }
 
     return { deletedIds: ids };
@@ -2942,17 +2946,17 @@ export class DataStoreService implements OnApplicationBootstrap {
     this.mem.rejectionLogs.delete(projectId);
 
     if (this.useDb) {
-      await this.prisma.projectRisk.deleteMany({ where: { projectId } }).catch(() => undefined);
-      await this.prisma.changeRequest.deleteMany({ where: { projectId } }).catch(() => undefined);
-      await this.prisma.rejectionLog.deleteMany({ where: { projectId } }).catch(() => undefined);
-      await this.prisma.task.deleteMany({ where: { projectId } });
-      await this.prisma.taskDependency.deleteMany({ where: { projectId } });
-      await this.prisma.resourceAssignment.deleteMany({ where: { projectId } });
-      await this.prisma.baseline.deleteMany({ where: { projectId } });
-      await this.prisma.budgetLineItem.deleteMany({ where: { projectId } });
-      await this.prisma.timesheetEntry.deleteMany({ where: { projectId } });
-      await this.prisma.projectMember.deleteMany({ where: { projectId } });
-      await this.prisma.project.delete({ where: { id: projectId } });
+      await this.db.projectRisk.deleteMany({ where: { projectId } }).catch(() => undefined);
+      await this.db.changeRequest.deleteMany({ where: { projectId } }).catch(() => undefined);
+      await this.db.rejectionLog.deleteMany({ where: { projectId } }).catch(() => undefined);
+      await this.db.task.deleteMany({ where: { projectId } });
+      await this.db.taskDependency.deleteMany({ where: { projectId } });
+      await this.db.resourceAssignment.deleteMany({ where: { projectId } });
+      await this.db.baseline.deleteMany({ where: { projectId } });
+      await this.db.budgetLineItem.deleteMany({ where: { projectId } });
+      await this.db.timesheetEntry.deleteMany({ where: { projectId } });
+      await this.db.projectMember.deleteMany({ where: { projectId } });
+      await this.db.project.delete({ where: { id: projectId } });
     }
     return true;
   }
@@ -2981,7 +2985,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(risk);
     this.mem.risks.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.projectRisk
+      await this.db.projectRisk
         .create({
           data: {
             id: risk.id,
@@ -3019,7 +3023,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     merged.riskScore = calcRiskScore(merged.probability, merged.impact);
     list[idx] = merged;
     if (this.useDb) {
-      await this.prisma.projectRisk
+      await this.db.projectRisk
         .update({
           where: { id: riskId },
           data: {
@@ -3048,7 +3052,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === list.length) return false;
     this.mem.risks.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.projectRisk.delete({ where: { id: riskId } }).catch(() => undefined);
+      await this.db.projectRisk.delete({ where: { id: riskId } }).catch(() => undefined);
     }
     return true;
   }
@@ -3080,7 +3084,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(cr);
     this.mem.changeRequests.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.changeRequest
+      await this.db.changeRequest
         .create({
           data: {
             id: cr.id,
@@ -3108,7 +3112,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (idx < 0) return null;
     list[idx] = { ...list[idx], ...patch, updatedAt: new Date().toISOString() };
     if (this.useDb) {
-      await this.prisma.changeRequest
+      await this.db.changeRequest
         .update({
           where: { id: crId },
           data: {
@@ -3133,7 +3137,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === list.length) return false;
     this.mem.changeRequests.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.changeRequest.delete({ where: { id: crId } }).catch(() => undefined);
+      await this.db.changeRequest.delete({ where: { id: crId } }).catch(() => undefined);
     }
     return true;
   }
@@ -3165,7 +3169,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     list.push(entry);
     this.mem.rejectionLogs.set(projectId, list);
     if (this.useDb) {
-      await this.prisma.rejectionLog
+      await this.db.rejectionLog
         .create({
           data: {
             id: entry.id,
@@ -3193,7 +3197,7 @@ export class DataStoreService implements OnApplicationBootstrap {
     if (next.length === list.length) return false;
     this.mem.rejectionLogs.set(projectId, next);
     if (this.useDb) {
-      await this.prisma.rejectionLog.delete({ where: { id: logId } }).catch(() => undefined);
+      await this.db.rejectionLog.delete({ where: { id: logId } }).catch(() => undefined);
     }
     return true;
   }

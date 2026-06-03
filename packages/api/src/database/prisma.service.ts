@@ -32,23 +32,31 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     if (process.env.VERCEL) return;
+    await this.connectHostedDb();
+  }
+
+  /** Vercel: connect in background so cold start can serve login immediately. */
+  async connectHostedDb(): Promise<boolean> {
+    if (this.connected) return true;
     const url = process.env.DATABASE_URL?.trim() ?? "";
-    if (!url) return;
+    if (!url) return false;
     const isBuildStub =
       url.includes("127.0.0.1") || url.includes("localhost") || url.includes("nexus_build");
-    if (process.env.VERCEL) {
-      if (isBuildStub || !isHostedMongoUrl(url)) {
+    if (isBuildStub || !isHostedMongoUrl(url)) {
+      if (process.env.VERCEL) {
         this.logger.warn("Skipping DATABASE_URL on Vercel — in-memory API mode (set Atlas mongodb+srv URL to persist).");
-        return;
       }
+      return false;
     }
     try {
       await withTimeout(this.$connect(), DB_CONNECT_TIMEOUT_MS, "Prisma connect");
       this.connected = true;
+      return true;
     } catch (err) {
       this.logger.warn(
         `Database unavailable (${err instanceof Error ? err.message : err}) — using in-memory store`,
       );
+      return false;
     }
   }
 

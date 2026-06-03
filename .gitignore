@@ -9,6 +9,8 @@ server/nest
 packages/web/server/nest
 api/runtime
 packages/web/api/runtime
+api/auth-lite
+packages/web/api/auth-lite
 .turbo
 .env
 .env.local

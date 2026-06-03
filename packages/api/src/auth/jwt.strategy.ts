@@ -22,6 +22,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): UserAccount {
+    if (process.env.VERCEL) {
+      return {
+        id: payload.sub,
+        email: payload.email,
+        name: payload.email.includes("@") ? payload.email.split("@")[0] : payload.email,
+        role: (payload.role ?? "team_member") as UserAccount["role"],
+        organizationId: payload.organizationId,
+      };
+    }
     const user = this.db.getUserById(payload.sub);
     if (!user) throw new UnauthorizedException();
     return user;

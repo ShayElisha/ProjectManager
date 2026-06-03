@@ -38,6 +38,7 @@ const dropPackages = [
   "terser",
   "caniuse-lite",
   "fork-ts-checker-webpack-plugin",
+  "libphonenumber-js",
 ];
 
 for (const pkg of dropPackages) {
@@ -63,8 +64,25 @@ function prunePrismaEngines(dir, label) {
   }
 }
 
-prunePrismaEngines(join(nm, "@prisma/engines"), "@prisma/engines");
+rm(join(nm, "@prisma/engines"), "@prisma/engines");
+rm(join(nm, "@prisma/fetch-engine"), "@prisma/fetch-engine");
+rm(join(nm, "@prisma/get-platform"), "@prisma/get-platform");
 prunePrismaEngines(join(nm, ".prisma/client"), ".prisma/client");
+
+/** MongoDB uses the native query engine; drop other DB wasm bundles (~60MB). */
+const prismaRuntime = join(nm, "@prisma/client/runtime");
+if (existsSync(prismaRuntime)) {
+  for (const name of readdirSync(prismaRuntime)) {
+    if (
+      name.includes("wasm") ||
+      /cockroachdb|postgresql|mysql|sqlite|sqlserver/.test(name)
+    ) {
+      rm(join(prismaRuntime, name), `@prisma/client/runtime/${name}`);
+    }
+  }
+}
+
+rm(join(runtimeDir, "data"), "data");
 
 /** Remove dev-only scripts from deployed package.json surface. */
 const pkgPath = join(runtimeDir, "package.json");

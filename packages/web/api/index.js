@@ -5,6 +5,8 @@ const fs = require("node:fs");
 
 function resolveServerlessEntry() {
   const candidates = [
+    path.join(__dirname, "runtime", "dist", "serverless.bundle.js"),
+    path.join(__dirname, "..", "..", "..", "api", "runtime", "dist", "serverless.bundle.js"),
     path.join(__dirname, "runtime", "dist", "serverless.js"),
     path.join(__dirname, "..", "..", "..", "api", "runtime", "dist", "serverless.js"),
     path.join(__dirname, "..", "..", "api", "dist", "serverless.js"),
@@ -17,7 +19,15 @@ function resolveServerlessEntry() {
   );
 }
 
-const mod = require(resolveServerlessEntry());
+let nestHandler;
 
-module.exports = mod.default ?? mod;
-module.exports.config = mod.config ?? { maxDuration: 60, memory: 1024 };
+async function handler(req, res) {
+  if (!nestHandler) {
+    const mod = require(resolveServerlessEntry());
+    nestHandler = mod.default ?? mod;
+  }
+  return nestHandler(req, res);
+}
+
+module.exports = handler;
+module.exports.config = { maxDuration: 300, memory: 1024 };
