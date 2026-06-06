@@ -71,6 +71,18 @@ async function downloadBlob(path: string, filename: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+function asExecutiveSummary(data: unknown): ExecutiveSummary | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  if (!Array.isArray(o.paragraphs) || !Array.isArray(o.actions)) return null;
+  return {
+    generatedAt: String(o.generatedAt ?? ""),
+    organizationName: String(o.organizationName ?? ""),
+    paragraphs: o.paragraphs as string[],
+    actions: o.actions as string[],
+  };
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     ...init,
@@ -222,7 +234,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  executiveSummary: () => fetchJson<ExecutiveSummary>("/portfolio/executive"),
+  executiveSummary: () =>
+    fetchJson<unknown>("/portfolio/executive").then(asExecutiveSummary),
   listRejections: (projectId?: string) =>
     fetchJson<RejectionRecord[]>(
       projectId ? `/rejections?projectId=${encodeURIComponent(projectId)}` : "/rejections",

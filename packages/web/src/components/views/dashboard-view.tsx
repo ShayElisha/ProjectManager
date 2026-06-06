@@ -248,7 +248,7 @@ export function DashboardView() {
 
   useEffect(() => {
     void loadPortfolio();
-    void api.executiveSummary().then(setSummary).catch(() => setSummary(null));
+    void api.executiveSummary().then((s) => setSummary(s)).catch(() => setSummary(null));
     void api.listRejections().then(setRejections).catch(() => setRejections([]));
   }, [loadPortfolio]);
 
@@ -681,9 +681,9 @@ export function DashboardView() {
           subtitle={t("dashboard.categorySub")}
           className="lg:col-span-5"
         >
-          {org.budgetByCategory.length > 0 ? (
+          {(org.budgetByCategory ?? []).length > 0 ? (
             <GroupedBudgetChart
-              items={org.budgetByCategory.slice(0, 6).map((c) => ({
+              items={(org.budgetByCategory ?? []).slice(0, 6).map((c) => ({
                 id: c.category,
                 label: t(`budget.categories.${c.category}`),
                 planned: c.planned,
@@ -864,7 +864,7 @@ export function DashboardView() {
         </Panel>
       )}
 
-      {summary && (
+      {summary?.paragraphs?.length ? (
         <section className="dashboard-glass rounded-2xl border border-[var(--accent)]/20 p-5">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles size={18} className="text-[var(--accent)]" />
@@ -877,13 +877,13 @@ export function DashboardView() {
               ))}
             </div>
             <ul className="list-disc space-y-1 ps-5 text-sm text-[var(--accent)]">
-              {summary.actions.slice(0, 5).map((a, i) => (
+              {(summary.actions ?? []).slice(0, 5).map((a, i) => (
                 <li key={i}>{a}</li>
               ))}
             </ul>
           </div>
         </section>
-      )}
+      ) : null}
 
       <Panel
         title={t("dashboard.tableTitle")}
@@ -1011,7 +1011,7 @@ export function DashboardView() {
           subtitle={t("dashboard.conflictsSub")}
         >
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {portfolio.resourceConflicts.slice(0, 9).map((c, i) => (
+            {(portfolio.resourceConflicts ?? []).slice(0, 9).map((c, i) => (
               <div
                 key={`${c.resourceId}-${c.date}-${i}`}
                 className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"

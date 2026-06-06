@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import type { ProjectHealth } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
-import { emptyExecutivePortfolio } from "@/lib/empty-portfolio";
+import { emptyExecutivePortfolio, emptyOrgDashboardRollup } from "@/lib/empty-portfolio";
 import { cn } from "@/lib/utils";
 import { ViewSkeleton } from "@/components/ui/view-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -45,11 +45,11 @@ export function PortfolioView() {
 
   useEffect(() => {
     void loadPortfolio();
-    void api.executiveSummary().then(setSummary).catch(() => setSummary(null));
+    void api.executiveSummary().then((s) => setSummary(s)).catch(() => setSummary(null));
   }, [loadPortfolio]);
 
   const portfolio = rawPortfolio ?? emptyExecutivePortfolio();
-  const org = portfolio.rollup;
+  const org = portfolio.rollup ?? emptyOrgDashboardRollup();
 
   const counts = useMemo(
     () =>
@@ -149,7 +149,7 @@ export function PortfolioView() {
         />
       </div>
 
-      {summary && (
+      {summary?.paragraphs?.length ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm space-y-2">
           <p className="font-medium">{t("executive.aiTitle")}</p>
           {summary.paragraphs.slice(0, 4).map((p, i) => (
@@ -158,12 +158,12 @@ export function PortfolioView() {
             </p>
           ))}
           <ul className="list-disc ps-5 text-xs text-[var(--accent)]">
-            {summary.actions.map((a, i) => (
+            {(summary.actions ?? []).map((a, i) => (
               <li key={i}>{a}</li>
             ))}
           </ul>
         </div>
-      )}
+      ) : null}
 
       {portfolio.resourceConflicts.length > 0 && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
