@@ -50,11 +50,11 @@ export class ProjectsController {
   }
 
   @Post()
-  create(@Req() req: { user: UserAccount }, @Body() body: Partial<Project>) {
+  async create(@Req() req: { user: UserAccount }, @Body() body: Partial<Project>) {
     const organizationId = body.organizationId ?? req.user.organizationId;
     if (!organizationId) throw new ForbiddenException("ORG_REQUIRED");
     assertOrgAccess(req.user, organizationId);
-    return this.projects.create({ ...body, organizationId });
+    return this.projects.create({ ...body, organizationId }, req.user);
   }
 
   @Patch(":id")

@@ -37,7 +37,7 @@ export class ProjectsService {
     return p;
   }
 
-  create(dto: Partial<Project>) {
+  async create(dto: Partial<Project>, user?: UserAccount) {
     if (dto.organizationId) {
       const count = this.db.getProjects().filter((p) => p.organizationId === dto.organizationId).length;
       const plans = this.db.getSubscriptionPlans();
@@ -46,7 +46,29 @@ export class ProjectsService {
         throw new BadRequestException(`PLAN_LIMIT: max ${plan.maxProjects} projects on ${plan.name}`);
       }
     }
-    return this.db.createProject(dto);
+    const project = await this.db.createProject(dto);
+    if (user?.email && project.organizationId) {
+      const email = user.email.trim().toLowerCase();
+      let resource = this.db
+        .getResources(project.organizationId)
+        .find((r) => r.email?.trim().toLowerCase() === email);
+      if (!resource) {
+        resource = await this.db.addResource(project.organizationId, {
+          name: user.name || email.split("@")[0] || "User",
+          type: "work",
+          email: user.email,
+          maxUnits: 1,
+        });
+      }
+      await this.db.addProjectMember({
+        id: uuid(),
+        projectId: project.id,
+        resourceId: resource.id,
+        role: "pm",
+        hoursPerDay: project.hoursPerDay,
+      });
+    }
+    return project;
   }
 
   async update(id: string, patch: Partial<Project>) {

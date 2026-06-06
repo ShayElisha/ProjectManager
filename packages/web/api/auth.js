@@ -271,6 +271,76 @@ async function handleOrganizations(payload) {
   return { status: 200, body: rows.map(mapOrganization) };
 }
 
+async function handleCreateProject(payload, body) {
+  const name = String(body.name || "").trim();
+  if (!name) {
+    return { status: 400, body: { statusCode: 400, message: "Bad Request" } };
+  }
+  const orgId = body.organizationId || payload.organizationId;
+  if (!orgId) {
+    return { status: 403, body: { statusCode: 403, message: "ORG_REQUIRED" } };
+  }
+
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const doc = {
+    _id: id,
+    organizationId: orgId,
+    parentId: body.parentId ?? null,
+    isTemplate: !!body.isTemplate,
+    name,
+    description: body.description,
+    locale: body.locale ?? "he",
+    currency: body.currency ?? "ILS",
+    startDate: body.startDate ?? now.slice(0, 10),
+    endDate: body.endDate,
+    status: body.status ?? "planning",
+    budgetCap: body.budgetCap,
+    hoursPerDay: body.hoursPerDay ?? 8,
+    workDays: body.workDays ?? [0, 1, 2, 3, 4],
+    defaultLinkType: body.defaultLinkType ?? "FS",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const created = await withMongo(async (db) => {
+    await db.collection("Project").insertOne(doc);
+
+    const email = String(payload.email || "")
+      .trim()
+      .toLowerCase();
+    if (email) {
+      let resource = await db.collection("Resource").findOne({ organizationId: orgId, email });
+      if (!resource) {
+        const resourceId = crypto.randomUUID();
+        resource = {
+          _id: resourceId,
+          organizationId: orgId,
+          name: email.split("@")[0] || "User",
+          type: "work",
+          email,
+          maxUnits: 1,
+        };
+        await db.collection("Resource").insertOne(resource);
+      }
+      const resourceId = resource._id?.toString?.() ?? String(resource._id);
+      await db.collection("ProjectMember").insertOne({
+        _id: crypto.randomUUID(),
+        projectId: id,
+        resourceId,
+        role: "pm",
+        hoursPerDay: doc.hoursPerDay,
+      });
+    }
+    return doc;
+  });
+
+  if (!created) {
+    return { status: 500, body: { statusCode: 500, message: "DATABASE_UNAVAILABLE" } };
+  }
+  return { status: 200, body: mapProject(created) };
+}
+
 async function handleProjects(payload, url) {
   const qs = new URL(url, "http://localhost");
   const orgId = qs.searchParams.get("organizationId") || payload.organizationId;
@@ -549,16 +619,22 @@ module.exports = async (req, res) => {
     if (req.method === "GET") {
       return send(res, await handleLiteGet(req));
     }
-    if (req.method !== "POST") {
-      return send(res, { status: 405, body: { statusCode: 405, message: "Method Not Allowed" } });
-    }
-    const action = routeAction(req.url);
-    if (!action) {
+    if (req.method === "POST") {
+      const path = pathOnly(req.url);
+      const body = await readBody(req);
+      const action = routeAction(req.url);
+      if (action === "login") return send(res, await handleLogin(body));
+      if (action === "register") return send(res, await handleRegister(body));
+      if (path === "/api/projects" || path.endsWith("/projects")) {
+        const payload = verifyBearer(req);
+        if (!payload) {
+          return send(res, { status: 401, body: { statusCode: 401, message: "Unauthorized" } });
+        }
+        return send(res, await handleCreateProject(payload, body));
+      }
       return send(res, { status: 404, body: { statusCode: 404, message: "Not Found" } });
     }
-    const body = await readBody(req);
-    const result = action === "login" ? await handleLogin(body) : await handleRegister(body);
-    return send(res, result);
+    return send(res, { status: 405, body: { statusCode: 405, message: "Method Not Allowed" } });
   } catch (err) {
     return send(res, {
       status: 500,
