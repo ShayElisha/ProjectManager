@@ -29,7 +29,7 @@ function dbNameFromUrl(url) {
 async function withMongo(fn) {
   const url = process.env.DATABASE_URL?.trim() ?? "";
   if (!url || !isAtlasUrl(url)) return null;
-  const client = new MongoClient(url, { serverSelectionTimeoutMS: 8000 });
+  const client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
   try {
     await client.connect();
     const db = client.db(dbNameFromUrl(url));
@@ -300,6 +300,177 @@ async function handleProjectById(payload, projectId) {
   return { status: 200, body: mapProject(doc) };
 }
 
+function emptyOrgRollup() {
+  return {
+    totalPv: 0,
+    totalEv: 0,
+    totalAc: 0,
+    totalEac: 0,
+    totalVac: 0,
+    totalCv: 0,
+    totalSv: 0,
+    totalBudgetCap: 0,
+    avgPercentBudgetUsed: null,
+    openRisks: 0,
+    highRisks: 0,
+    pendingChangeRequests: 0,
+    pendingChangeImpactDays: 0,
+    pendingChangeImpactCost: 0,
+    pendingTimesheets: 0,
+    pendingTimesheetHours: 0,
+    totalCriticalTasks: 0,
+    onTimeProjects: 0,
+    delayedProjects: 0,
+    resourceConflictCount: 0,
+    projectsByStatus: { planning: 0, active: 0, on_hold: 0, completed: 0 },
+    budgetByCategory: [],
+  };
+}
+
+function emptyExecutiveBody(orgId = "", orgName = "") {
+  return {
+    organizationId: orgId,
+    organizationName: orgName,
+    projects: [],
+    resourceConflicts: [],
+    generatedAt: new Date().toISOString(),
+    counts: { on_track: 0, at_risk: 0, critical: 0 },
+    rollup: emptyOrgRollup(),
+  };
+}
+
+async function handlePortfolioExecutive(payload) {
+  const orgId = payload.organizationId;
+  const built = await withMongo(async (db) => {
+    const org = orgId
+      ? await db.collection("Organization").findOne({ _id: orgId })
+      : await db.collection("Organization").findOne({});
+    const resolvedOrgId = org?._id?.toString?.() ?? orgId ?? "";
+    const orgName = org?.name ?? "Organization";
+
+    const filter = { isTemplate: { $ne: true } };
+    if (resolvedOrgId) filter.organizationId = resolvedOrgId;
+    const projects = await db.collection("Project").find(filter).toArray();
+    const projectIds = projects.map((p) => p._id?.toString?.() ?? String(p._id));
+
+    const taskStats = new Map();
+    if (projectIds.length > 0) {
+      const stats = await db
+        .collection("Task")
+        .aggregate([
+          { $match: { projectId: { $in: projectIds }, isSummary: { $ne: true } } },
+          {
+            $group: {
+              _id: "$projectId",
+              count: { $sum: 1 },
+              avgComplete: { $avg: "$percentComplete" },
+              criticalCount: { $sum: { $cond: [{ $eq: ["$isCritical", true] }, 1, 0] } },
+            },
+          },
+        ])
+        .toArray();
+      for (const s of stats) taskStats.set(s._id, s);
+    }
+
+    const summaries = projects.map((doc) => {
+      const id = doc._id?.toString?.() ?? String(doc._id);
+      const ts = taskStats.get(id) ?? { count: 0, avgComplete: 0, criticalCount: 0 };
+      return {
+        ...mapProject(doc),
+        taskCount: ts.count,
+        percentComplete: Math.round(ts.avgComplete || 0),
+        plannedBudget: 0,
+        actualCost: 0,
+        criticalCount: ts.criticalCount || 0,
+        health: "on_track",
+        scheduleVarianceDays: 0,
+        budgetVariance: null,
+        forecastDelayDays: 0,
+        cpi: 1,
+        spi: 1,
+        lateTaskCount: 0,
+        pv: 0,
+        ev: 0,
+        eac: 0,
+        vac: 0,
+        percentBudgetUsed: null,
+      };
+    });
+
+    const counts = { on_track: 0, at_risk: 0, critical: 0 };
+    const rollup = emptyOrgRollup();
+    for (const p of summaries) {
+      counts[p.health]++;
+      rollup.projectsByStatus[p.status]++;
+      rollup.onTimeProjects++;
+      rollup.totalCriticalTasks += p.criticalCount;
+    }
+
+    return {
+      organizationId: resolvedOrgId,
+      organizationName: orgName,
+      projects: summaries,
+      resourceConflicts: [],
+      generatedAt: new Date().toISOString(),
+      counts,
+      rollup,
+    };
+  });
+
+  return { status: 200, body: built ?? emptyExecutiveBody(orgId) };
+}
+
+async function handleRejections(payload, url) {
+  const qs = new URL(url, "http://localhost");
+  const projectId = qs.searchParams.get("projectId");
+  const rows = await withMongo(async (db) => {
+    const filter = {};
+    if (projectId) {
+      filter.projectId = projectId;
+    } else if (payload.organizationId) {
+      const projs = await db
+        .collection("Project")
+        .find({ organizationId: payload.organizationId })
+        .project({ _id: 1, name: 1 })
+        .toArray();
+      const ids = projs.map((p) => p._id?.toString?.() ?? String(p._id));
+      if (ids.length === 0) return [];
+      filter.projectId = { $in: ids };
+    }
+    const names = new Map();
+    if (payload.organizationId) {
+      const projs = await db
+        .collection("Project")
+        .find(
+          projectId ? { _id: projectId } : { organizationId: payload.organizationId },
+        )
+        .project({ _id: 1, name: 1 })
+        .toArray();
+      for (const p of projs) names.set(p._id?.toString?.() ?? String(p._id), p.name ?? "");
+    }
+    const logs = await db
+      .collection("RejectionLog")
+      .find(filter)
+      .sort({ rejectedAt: -1 })
+      .limit(200)
+      .toArray();
+    return logs.map((r) => ({
+      id: r._id?.toString?.() ?? String(r._id),
+      kind: "manual",
+      projectId: r.projectId,
+      projectName: names.get(r.projectId) ?? "",
+      title: r.title,
+      detail: r.description ?? undefined,
+      rejectedAt: r.rejectedAt,
+      decisionNote: r.decisionNote ?? undefined,
+      impactScheduleDays: r.impactScheduleDays ?? undefined,
+      impactCost: r.impactCost ?? undefined,
+      taskId: r.taskId ?? undefined,
+    }));
+  });
+  return { status: 200, body: rows ?? [] };
+}
+
 function isPublicAuthPath(path) {
   return path.endsWith("/auth/login") || path.endsWith("/auth/register");
 }
@@ -313,6 +484,8 @@ async function handleLiteGet(req) {
   if (!payload) return { status: 401, body: { statusCode: 401, message: "Unauthorized" } };
   if (path.endsWith("/auth/me")) return handleMe(payload);
   if (path.endsWith("/organizations")) return handleOrganizations(payload);
+  if (path.endsWith("/portfolio/executive")) return handlePortfolioExecutive(payload);
+  if (path === "/api/rejections" || path.endsWith("/rejections")) return handleRejections(payload, req.url);
   if (path === "/api/projects" || path.endsWith("/projects")) return handleProjects(payload, req.url);
   const m = path.match(/\/projects\/([^/]+)$/);
   if (m) return handleProjectById(payload, m[1]);

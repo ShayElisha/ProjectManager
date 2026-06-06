@@ -36,6 +36,8 @@
     { "source": "/api/organizations", "destination": "/packages/web/api/auth.js" },
     { "source": "/api/projects", "destination": "/packages/web/api/auth.js" },
     { "source": "/api/projects/:id", "destination": "/packages/web/api/auth.js" },
+    { "source": "/api/portfolio/executive", "destination": "/packages/web/api/auth.js" },
+    { "source": "/api/rejections", "destination": "/packages/web/api/auth.js" },
     { "source": "/api", "destination": "/packages/web/api/index.js" },
     { "source": "/api/(.*)", "destination": "/packages/web/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

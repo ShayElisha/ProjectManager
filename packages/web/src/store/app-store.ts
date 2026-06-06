@@ -250,12 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const orgId = useOrgStore.getState().activeOrganizationId ?? "";
     const empty = emptyExecutivePortfolio(orgId);
     try {
-      const portfolio = await Promise.race([
-        api.portfolio(),
-        new Promise<ExecutivePortfolioSummary>((resolve) => {
-          window.setTimeout(() => resolve(empty), 45_000);
-        }),
-      ]);
+      const portfolio = await api.portfolio();
       set({ portfolio });
     } catch {
       set({ portfolio: empty });
