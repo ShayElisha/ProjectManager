@@ -6,7 +6,9 @@ import type {
   PortfolioProjectSummary,
   PortfolioSimulateResult,
   ResourceConflict,
+  UserAccount,
 } from "@nexus/shared";
+import { filterProjectsForUser } from "../common/org-access";
 import {
   detectOverAllocations,
   getProjectFinancials,
@@ -30,12 +32,12 @@ const BUDGET_CATEGORIES: BudgetCategory[] = [
 export class PortfolioService {
   constructor(private readonly db: DataStoreService) {}
 
-  getOverview(organizationId?: string): PortfolioOverview {
-    return this.buildOverview(organizationId);
+  getOverview(organizationId?: string, user?: UserAccount): PortfolioOverview {
+    return this.buildOverview(organizationId, user);
   }
 
-  getExecutive(organizationId?: string) {
-    const overview = this.buildOverview(organizationId);
+  getExecutive(organizationId?: string, user?: UserAccount) {
+    const overview = this.buildOverview(organizationId, user);
     const counts = { on_track: 0, at_risk: 0, critical: 0 };
     for (const p of overview.projects) {
       counts[p.health]++;
@@ -48,12 +50,13 @@ export class PortfolioService {
     };
   }
 
-  private buildOverview(organizationId?: string): PortfolioOverview {
+  private buildOverview(organizationId?: string, user?: UserAccount): PortfolioOverview {
     let projects = this.db.getProjects();
     const orgId = organizationId ?? projects[0]?.organizationId ?? this.db.mem.organizationId;
     if (orgId) {
       projects = projects.filter((p) => p.organizationId === orgId);
     }
+    projects = filterProjectsForUser(this.db, projects, user);
 
     const summaries: PortfolioProjectSummary[] = projects.map((p) => {
       const tasks = this.db.getTasks(p.id);

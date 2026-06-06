@@ -276,8 +276,11 @@ async function handleProjects(payload, url) {
   const orgId = qs.searchParams.get("organizationId") || payload.organizationId;
   const parentId = qs.searchParams.get("parentId");
   const isTemplate = qs.searchParams.get("isTemplate");
-  const rows = await withMongo((db) => {
-    const filter = {};
+  const rows = await withMongo(async (db) => {
+    const allowedIds = await userAccessibleProjectIds(db, payload);
+    if (allowedIds.length === 0) return [];
+
+    const filter = { _id: { $in: allowedIds } };
     if (orgId) filter.organizationId = orgId;
     if (parentId !== null && parentId !== undefined && parentId !== "") {
       filter.parentId = parentId === "null" ? null : parentId;
@@ -292,12 +295,51 @@ async function handleProjects(payload, url) {
 }
 
 async function handleProjectById(payload, projectId) {
-  const doc = await withMongo((db) => db.collection("Project").findOne({ _id: projectId }));
+  const doc = await withMongo(async (db) => {
+    const allowedIds = await userAccessibleProjectIds(db, payload);
+    if (!allowedIds.includes(String(projectId))) return null;
+    return db.collection("Project").findOne({ _id: projectId });
+  });
   if (!doc) return { status: 404, body: { statusCode: 404, message: "Not Found" } };
   if (payload.organizationId && doc.organizationId !== payload.organizationId) {
     return { status: 403, body: { statusCode: 403, message: "Forbidden" } };
   }
   return { status: 200, body: mapProject(doc) };
+}
+
+async function userAccessibleProjectIds(db, payload) {
+  const email = String(payload.email || "")
+    .trim()
+    .toLowerCase();
+  const orgId = payload.organizationId;
+  if (!email) return [];
+
+  const resFilter = {};
+  if (orgId) resFilter.organizationId = orgId;
+  resFilter.email = email;
+  const resources = await db.collection("Resource").find(resFilter).toArray();
+  const resourceIds = resources.map((r) => r._id?.toString?.() ?? String(r._id));
+  if (resourceIds.length === 0) return [];
+
+  const projectIdSet = new Set();
+  const members = await db
+    .collection("ProjectMember")
+    .find({ resourceId: { $in: resourceIds } })
+    .toArray();
+  for (const m of members) {
+    if (m.projectId) projectIdSet.add(String(m.projectId));
+  }
+
+  const assigned = await db
+    .collection("Task")
+    .find({ assigneeIds: { $in: resourceIds } })
+    .project({ projectId: 1 })
+    .toArray();
+  for (const t of assigned) {
+    if (t.projectId) projectIdSet.add(String(t.projectId));
+  }
+
+  return [...projectIdSet];
 }
 
 function emptyOrgRollup() {
@@ -342,13 +384,21 @@ function emptyExecutiveBody(orgId = "", orgName = "") {
 async function handlePortfolioExecutive(payload) {
   const orgId = payload.organizationId;
   const built = await withMongo(async (db) => {
+    const allowedIds = await userAccessibleProjectIds(db, payload);
+    if (allowedIds.length === 0) {
+      return emptyExecutiveBody(orgId);
+    }
+
     const org = orgId
       ? await db.collection("Organization").findOne({ _id: orgId })
       : await db.collection("Organization").findOne({});
     const resolvedOrgId = org?._id?.toString?.() ?? orgId ?? "";
     const orgName = org?.name ?? "Organization";
 
-    const filter = { isTemplate: { $ne: true } };
+    const filter = {
+      _id: { $in: allowedIds },
+      isTemplate: { $ne: true },
+    };
     if (resolvedOrgId) filter.organizationId = resolvedOrgId;
     const projects = await db.collection("Project").find(filter).toArray();
     const projectIds = projects.map((p) => p._id?.toString?.() ?? String(p._id));
@@ -424,30 +474,26 @@ async function handleRejections(payload, url) {
   const qs = new URL(url, "http://localhost");
   const projectId = qs.searchParams.get("projectId");
   const rows = await withMongo(async (db) => {
+    const allowedIds = await userAccessibleProjectIds(db, payload);
+    if (allowedIds.length === 0) return [];
+
     const filter = {};
     if (projectId) {
+      if (!allowedIds.includes(String(projectId))) return [];
       filter.projectId = projectId;
-    } else if (payload.organizationId) {
-      const projs = await db
-        .collection("Project")
-        .find({ organizationId: payload.organizationId })
-        .project({ _id: 1, name: 1 })
-        .toArray();
-      const ids = projs.map((p) => p._id?.toString?.() ?? String(p._id));
-      if (ids.length === 0) return [];
-      filter.projectId = { $in: ids };
+    } else {
+      filter.projectId = { $in: allowedIds };
     }
+
     const names = new Map();
-    if (payload.organizationId) {
-      const projs = await db
-        .collection("Project")
-        .find(
-          projectId ? { _id: projectId } : { organizationId: payload.organizationId },
-        )
-        .project({ _id: 1, name: 1 })
-        .toArray();
-      for (const p of projs) names.set(p._id?.toString?.() ?? String(p._id), p.name ?? "");
-    }
+    const projs = await db
+      .collection("Project")
+      .find(
+        projectId ? { _id: projectId } : { _id: { $in: allowedIds } },
+      )
+      .project({ _id: 1, name: 1 })
+      .toArray();
+    for (const p of projs) names.set(p._id?.toString?.() ?? String(p._id), p.name ?? "");
     const logs = await db
       .collection("RejectionLog")
       .find(filter)

@@ -1,18 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { getProjectFinancials } from "@nexus/shared";
-import type { Project, EVMMetrics, Task, TaskDependency } from "@nexus/shared";
+import type { Project, EVMMetrics, Task, TaskDependency, UserAccount } from "@nexus/shared";
 import { v4 as uuid } from "uuid";
+import { filterProjectsForUser } from "../common/org-access";
 import { DataStoreService } from "../database/data-store.service";
 
 @Injectable()
 export class ProjectsService {
   constructor(private readonly db: DataStoreService) {}
 
-  findAll(filters?: {
-    organizationId?: string;
-    parentId?: string | null;
-    isTemplate?: boolean;
-  }): Project[] {
+  findAll(
+    filters?: {
+      organizationId?: string;
+      parentId?: string | null;
+      isTemplate?: boolean;
+    },
+    user?: UserAccount,
+  ): Project[] {
     let list = this.db.getProjects();
     if (filters?.organizationId) {
       list = list.filter((p) => p.organizationId === filters.organizationId);
@@ -24,7 +28,7 @@ export class ProjectsService {
       const pid = filters.parentId ?? null;
       list = list.filter((p) => (p.parentId ?? null) === pid);
     }
-    return list;
+    return filterProjectsForUser(this.db, list, user);
   }
 
   findOne(id: string): Project {

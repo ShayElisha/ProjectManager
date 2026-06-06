@@ -33,11 +33,14 @@ export class ProjectsController {
     @Query("isTemplate") isTemplate?: string,
   ) {
     const orgId = resolveOrgFilter(req.user, organizationId);
-    return this.projects.findAll({
-      organizationId: orgId,
-      parentId: parentId === undefined ? undefined : parentId === "null" ? null : parentId,
-      isTemplate: isTemplate === undefined ? undefined : isTemplate === "true",
-    });
+    return this.projects.findAll(
+      {
+        organizationId: orgId,
+        parentId: parentId === undefined ? undefined : parentId === "null" ? null : parentId,
+        isTemplate: isTemplate === undefined ? undefined : isTemplate === "true",
+      },
+      req.user,
+    );
   }
 
   @Get(":id")

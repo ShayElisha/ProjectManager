@@ -10,13 +10,13 @@ export class PortfolioController {
   @Get()
   overview(@Req() req: { user: UserAccount }) {
     const orgId = resolveOrgFilter(req.user);
-    return this.portfolio.getOverview(orgId);
+    return this.portfolio.getOverview(orgId, req.user);
   }
 
   @Get("executive")
   executive(@Req() req: { user: UserAccount }) {
     const orgId = resolveOrgFilter(req.user);
-    return this.portfolio.getExecutive(orgId);
+    return this.portfolio.getExecutive(orgId, req.user);
   }
 
   @Post("simulate-load")
