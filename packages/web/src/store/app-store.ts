@@ -248,18 +248,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadPortfolio: async () => {
     set({ portfolioLoading: true });
     const orgId = useOrgStore.getState().activeOrganizationId ?? "";
-    const fallback = () => set({ portfolio: emptyExecutivePortfolio(orgId) });
+    const empty = emptyExecutivePortfolio(orgId);
     try {
       const portfolio = await Promise.race([
         api.portfolio(),
-        new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error("PORTFOLIO_LOAD_TIMEOUT")), 45_000);
+        new Promise<ExecutivePortfolioSummary>((resolve) => {
+          window.setTimeout(() => resolve(empty), 45_000);
         }),
       ]);
       set({ portfolio });
-    } catch (err) {
-      console.error("[NexusProject] loadPortfolio failed:", err);
-      fallback();
+    } catch {
+      set({ portfolio: empty });
     } finally {
       set({ portfolioLoading: false });
     }
