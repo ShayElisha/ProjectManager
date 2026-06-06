@@ -270,19 +270,12 @@ export function DashboardView() {
   const rollup = useMemo(() => computeRollup(portfolio), [portfolio]);
 
   const scheduleOutlook = useMemo(() => {
-    const empty = {
+    const counts = {
       on_time: 0,
       at_risk: 0,
       delayed: 0,
       severe: 0,
     };
-    const emptyLists: Record<ScheduleOutlook, PortfolioProjectSummary[]> = {
-      on_time: [],
-      at_risk: [],
-      delayed: [],
-      severe: [],
-    };
-    const counts = { ...empty };
     const byOutlook = {
       on_time: [] as PortfolioProjectSummary[],
       at_risk: [] as PortfolioProjectSummary[],
