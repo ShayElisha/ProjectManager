@@ -23,6 +23,7 @@ import { useOrgStore } from "@/store/org-store";
 import { useAuthStore } from "@/store/auth-store";
 import { tasksAlreadyLinked } from "@/lib/link-rules";
 import { toast } from "@/lib/toast";
+import { emptyExecutivePortfolio } from "@/lib/empty-portfolio";
 
 export type AppSection =
   | "dashboard"
@@ -247,6 +248,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const portfolio = await api.portfolio();
       set({ portfolio });
+    } catch (err) {
+      console.error("[NexusProject] loadPortfolio failed:", err);
+      const orgId = useOrgStore.getState().activeOrganizationId ?? "";
+      set({ portfolio: emptyExecutivePortfolio(orgId) });
     } finally {
       set({ loading: false });
     }

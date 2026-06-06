@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import type { ProjectHealth } from "@nexus/shared";
 import { useAppStore } from "@/store/app-store";
+import { emptyExecutivePortfolio } from "@/lib/empty-portfolio";
 import { cn } from "@/lib/utils";
 import { ViewSkeleton } from "@/components/ui/view-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,7 +25,7 @@ const HEALTH_ROW: Record<ProjectHealth, string> = {
 
 export function PortfolioView() {
   const { t } = useTranslation();
-  const portfolio = useAppStore((s) => s.portfolio);
+  const rawPortfolio = useAppStore((s) => s.portfolio);
   const allProjects = useAppStore((s) => s.projects);
   const loading = useAppStore((s) => s.loading);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
@@ -37,15 +38,11 @@ export function PortfolioView() {
     void api.executiveSummary().then(setSummary).catch(() => setSummary(null));
   }, [loadPortfolio]);
 
-  if (!portfolio && loading) {
+  if (loading && rawPortfolio === null) {
     return <ViewSkeleton variant="cards" className="p-4" />;
   }
 
-  if (!portfolio) {
-    return (
-      <ViewSkeleton variant="cards" className="p-4" />
-    );
-  }
+  const portfolio = rawPortfolio ?? emptyExecutivePortfolio();
 
   const counts =
     portfolio.counts ??

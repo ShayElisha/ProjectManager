@@ -23,6 +23,7 @@ import type {
   RejectionRecord,
 } from "@nexus/shared";
 import { api } from "@/lib/api";
+import { emptyExecutivePortfolio } from "@/lib/empty-portfolio";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -236,7 +237,8 @@ function Panel({
 
 export function DashboardView() {
   const { t } = useTranslation();
-  const portfolio = useAppStore((s) => s.portfolio);
+  const rawPortfolio = useAppStore((s) => s.portfolio);
+  const loading = useAppStore((s) => s.loading);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
   const selectProject = useAppStore((s) => s.selectProject);
   const setSection = useAppStore((s) => s.setSection);
@@ -250,8 +252,9 @@ export function DashboardView() {
     void api.listRejections().then(setRejections).catch(() => setRejections([]));
   }, [loadPortfolio]);
 
+  const portfolio = rawPortfolio ?? emptyExecutivePortfolio();
+
   const counts = useMemo(() => {
-    if (!portfolio) return { on_track: 0, at_risk: 0, critical: 0 };
     return (
       portfolio.counts ??
       portfolio.projects.reduce(
@@ -264,10 +267,7 @@ export function DashboardView() {
     );
   }, [portfolio]);
 
-  const rollup = useMemo(
-    () => (portfolio ? computeRollup(portfolio) : null),
-    [portfolio],
-  );
+  const rollup = useMemo(() => computeRollup(portfolio), [portfolio]);
 
   const scheduleOutlook = useMemo(() => {
     const empty = {
@@ -282,7 +282,6 @@ export function DashboardView() {
       delayed: [],
       severe: [],
     };
-    if (!portfolio) return { counts: empty, byOutlook: emptyLists };
     const counts = { ...empty };
     const byOutlook = {
       on_time: [] as PortfolioProjectSummary[],
@@ -305,7 +304,7 @@ export function DashboardView() {
       maximumFractionDigits: 0,
     }).format(n);
 
-  if (!portfolio || !rollup) {
+  if (loading && rawPortfolio === null) {
     return <DashboardLoading />;
   }
 
