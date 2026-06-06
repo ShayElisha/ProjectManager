@@ -238,7 +238,7 @@ function Panel({
 export function DashboardView() {
   const { t } = useTranslation();
   const rawPortfolio = useAppStore((s) => s.portfolio);
-  const loading = useAppStore((s) => s.loading);
+  const portfolioLoading = useAppStore((s) => s.portfolioLoading);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
   const selectProject = useAppStore((s) => s.selectProject);
   const setSection = useAppStore((s) => s.setSection);
@@ -297,7 +297,7 @@ export function DashboardView() {
       maximumFractionDigits: 0,
     }).format(n);
 
-  if (loading && rawPortfolio === null) {
+  if (portfolioLoading && rawPortfolio === null) {
     return <DashboardLoading />;
   }
 

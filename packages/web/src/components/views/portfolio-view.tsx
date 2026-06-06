@@ -23,11 +23,21 @@ const HEALTH_ROW: Record<ProjectHealth, string> = {
   critical: "border-red-500/40 bg-red-500/8",
 };
 
+function PortfolioKpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {sub ? <p className="mt-0.5 text-xs text-[var(--muted)]">{sub}</p> : null}
+    </div>
+  );
+}
+
 export function PortfolioView() {
   const { t } = useTranslation();
   const rawPortfolio = useAppStore((s) => s.portfolio);
+  const portfolioLoading = useAppStore((s) => s.portfolioLoading);
   const allProjects = useAppStore((s) => s.projects);
-  const loading = useAppStore((s) => s.loading);
   const loadPortfolio = useAppStore((s) => s.loadPortfolio);
   const selectProject = useAppStore((s) => s.selectProject);
 
@@ -38,24 +48,23 @@ export function PortfolioView() {
     void api.executiveSummary().then(setSummary).catch(() => setSummary(null));
   }, [loadPortfolio]);
 
-  if (loading && rawPortfolio === null) {
-    return <ViewSkeleton variant="cards" className="p-4" />;
-  }
-
   const portfolio = rawPortfolio ?? emptyExecutivePortfolio();
+  const org = portfolio.rollup;
 
-  const counts =
-    portfolio.counts ??
-    portfolio.projects.reduce(
-      (acc, p) => {
-        acc[p.health]++;
-        return acc;
-      },
-      { on_track: 0, at_risk: 0, critical: 0 } as Record<ProjectHealth, number>,
-    );
+  const counts = useMemo(
+    () =>
+      portfolio.counts ??
+      portfolio.projects.reduce(
+        (acc, p) => {
+          acc[p.health]++;
+          return acc;
+        },
+        { on_track: 0, at_risk: 0, critical: 0 } as Record<ProjectHealth, number>,
+      ),
+    [portfolio],
+  );
 
   const programGroups = useMemo(() => {
-    if (!portfolio) return [];
     const groups = new Map<string, typeof portfolio.projects>();
     for (const p of portfolio.projects) {
       const meta = allProjects.find((ap) => ap.id === p.id);
@@ -81,12 +90,18 @@ export function PortfolioView() {
       maximumFractionDigits: 0,
     }).format(n);
 
+  if (portfolioLoading && rawPortfolio === null) {
+    return <ViewSkeleton variant="cards" className="p-4" />;
+  }
+
   return (
     <div className="flex flex-col gap-4 p-1 pb-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">{t("executive.title")}</h2>
-          <p className="text-sm text-[var(--muted)]">{portfolio.organizationName}</p>
+          <p className="text-sm text-[var(--muted)]">
+            {portfolio.organizationName || t("portfolio.title")}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-700 dark:text-emerald-400">
@@ -99,6 +114,39 @@ export function PortfolioView() {
             {t("executive.countCritical", { count: counts.critical })}
           </span>
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PortfolioKpi
+          label={t("dashboard.projects")}
+          value={String(portfolio.projects.length)}
+        />
+        <PortfolioKpi
+          label={t("dashboard.priority.onTime")}
+          value={String(org.onTimeProjects)}
+          sub={t("dashboard.priority.delayedSub", { count: org.delayedProjects })}
+        />
+        <PortfolioKpi
+          label={t("dashboard.priority.risks")}
+          value={String(org.openRisks)}
+          sub={t("dashboard.priority.highRisks", { count: org.highRisks })}
+        />
+        <PortfolioKpi
+          label={t("dashboard.priority.conflicts")}
+          value={String(org.resourceConflictCount)}
+          sub={t("dashboard.priority.criticalTasks", { count: org.totalCriticalTasks })}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PortfolioKpi label={t("dashboard.evm.pv")} value={fmt(org.totalPv)} />
+        <PortfolioKpi label={t("dashboard.evm.ev")} value={fmt(org.totalEv)} />
+        <PortfolioKpi label={t("dashboard.evm.ac")} value={fmt(org.totalAc)} />
+        <PortfolioKpi
+          label={t("dashboard.priority.forecastCost")}
+          value={fmt(org.totalEac)}
+          sub={t("dashboard.priority.vac", { amount: fmt(org.totalVac) })}
+        />
       </div>
 
       {summary && (
@@ -148,71 +196,69 @@ export function PortfolioView() {
                   </td>
                 </tr>
                 {group.projects.map((p) => (
-              <tr
-                key={p.id}
-                className={cn(
-                  "cursor-pointer border-b border-[var(--border)]/50 transition-colors hover:bg-[var(--accent)]/5",
-                  HEALTH_ROW[p.health],
-                )}
-                onClick={() => void selectProject(p.id)}
-              >
-                <td className="px-2 py-3">
-                  <span
-                    className={cn("inline-block h-8 w-1.5 rounded-full", HEALTH_STYLES[p.health])}
-                    title={t(`executive.health_${p.health}`)}
-                  />
-                </td>
-                <td className="px-3 py-3">
-                  <p className="font-medium">{p.name}</p>
-                  {p.lateTaskCount > 0 && (
-                    <p className="text-xs text-red-600">
-                      {t("executive.lateTasks", { count: p.lateTaskCount })}
-                    </p>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-center tabular-nums">
-                  <div className="mx-auto h-1.5 w-16 overflow-hidden rounded-full bg-[var(--border)]">
-                    <div
-                      className="h-full bg-[var(--accent)]"
-                      style={{ width: `${p.percentComplete}%` }}
-                    />
-                  </div>
-                  <span className="text-xs">{p.percentComplete}%</span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span
+                  <tr
+                    key={p.id}
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-                      p.health === "on_track" && "bg-emerald-500/15 text-emerald-700",
-                      p.health === "at_risk" && "bg-amber-500/15 text-amber-700",
-                      p.health === "critical" && "bg-red-500/15 text-red-600",
+                      "cursor-pointer border-b border-[var(--border)]/50 transition-colors hover:bg-[var(--accent)]/5",
+                      HEALTH_ROW[p.health],
                     )}
+                    onClick={() => void selectProject(p.id)}
                   >
-                    {t(`executive.health_${p.health}`)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center tabular-nums">
-                  {p.forecastDelayDays > 0 ? (
-                    <span className="font-medium text-red-600">
-                      +{p.forecastDelayDays}d
-                    </span>
-                  ) : (
-                    <span className="text-[var(--muted)]">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-end tabular-nums">
-                  {p.budgetVariance != null ? (
-                    <span className={p.budgetVariance < 0 ? "text-red-600" : "text-emerald-600"}>
-                      {fmt(p.budgetVariance, p.currency)}
-                    </span>
-                  ) : (
-                    <span className="text-[var(--muted)]">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-center text-xs tabular-nums text-[var(--muted)]">
-                  {p.cpi}/{p.spi}
-                </td>
-              </tr>
+                    <td className="px-2 py-3">
+                      <span
+                        className={cn("inline-block h-8 w-1.5 rounded-full", HEALTH_STYLES[p.health])}
+                        title={t(`executive.health_${p.health}`)}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="font-medium">{p.name}</p>
+                      {p.lateTaskCount > 0 && (
+                        <p className="text-xs text-red-600">
+                          {t("executive.lateTasks", { count: p.lateTaskCount })}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center tabular-nums">
+                      <div className="mx-auto h-1.5 w-16 overflow-hidden rounded-full bg-[var(--border)]">
+                        <div
+                          className="h-full bg-[var(--accent)]"
+                          style={{ width: `${p.percentComplete}%` }}
+                        />
+                      </div>
+                      <span className="text-xs">{p.percentComplete}%</span>
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                          p.health === "on_track" && "bg-emerald-500/15 text-emerald-700",
+                          p.health === "at_risk" && "bg-amber-500/15 text-amber-700",
+                          p.health === "critical" && "bg-red-500/15 text-red-600",
+                        )}
+                      >
+                        {t(`executive.health_${p.health}`)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-center tabular-nums">
+                      {p.forecastDelayDays > 0 ? (
+                        <span className="font-medium text-red-600">+{p.forecastDelayDays}d</span>
+                      ) : (
+                        <span className="text-[var(--muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-end tabular-nums">
+                      {p.budgetVariance != null ? (
+                        <span className={p.budgetVariance < 0 ? "text-red-600" : "text-emerald-600"}>
+                          {fmt(p.budgetVariance, p.currency)}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center text-xs tabular-nums text-[var(--muted)]">
+                      {p.cpi}/{p.spi}
+                    </td>
+                  </tr>
                 ))}
               </Fragment>
             ))}

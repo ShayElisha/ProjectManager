@@ -73,6 +73,7 @@ interface AppState {
   evm: EVMMetrics | null;
   budgetOverview: BudgetOverviewReport | null;
   portfolio: ExecutivePortfolioSummary | null;
+  portfolioLoading: boolean;
   baselines: Baseline[];
   histogram: AllocationSlot[];
   leveling: LevelingSuggestion[];
@@ -169,6 +170,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   evm: null,
   budgetOverview: null,
   portfolio: null,
+  portfolioLoading: false,
   baselines: [],
   histogram: [],
   leveling: [],
@@ -244,16 +246,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadPortfolio: async () => {
-    set({ loading: true });
+    set({ portfolioLoading: true });
+    const orgId = useOrgStore.getState().activeOrganizationId ?? "";
+    const fallback = () => set({ portfolio: emptyExecutivePortfolio(orgId) });
     try {
-      const portfolio = await api.portfolio();
+      const portfolio = await Promise.race([
+        api.portfolio(),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("PORTFOLIO_LOAD_TIMEOUT")), 45_000);
+        }),
+      ]);
       set({ portfolio });
     } catch (err) {
       console.error("[NexusProject] loadPortfolio failed:", err);
-      const orgId = useOrgStore.getState().activeOrganizationId ?? "";
-      set({ portfolio: emptyExecutivePortfolio(orgId) });
+      fallback();
     } finally {
-      set({ loading: false });
+      set({ portfolioLoading: false });
     }
   },
 
